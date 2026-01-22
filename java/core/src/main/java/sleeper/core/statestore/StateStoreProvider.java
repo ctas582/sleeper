@@ -19,16 +19,19 @@ import sleeper.core.properties.instance.InstanceProperties;
 import sleeper.core.properties.table.TableProperties;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
+import java.util.Set;
 
 import static sleeper.core.properties.instance.TableStateProperty.STATESTORE_PROVIDER_CACHE_SIZE;
 import static sleeper.core.properties.table.TableProperty.TABLE_ID;
 
 /**
- * Caches Sleeper table state store objects up to a maximum size. If the cache is full, the oldest state store objects
- * be removed from the cache. An instance of this class cannot be used concurrently in multiple threads,
+ * Caches Sleeper table state store objects up to a maximum size. If the cache is full, the LRU state store objects
+ * are removed from the cache. An instance of this class cannot be used concurrently in multiple threads,
  * as the cache is not thread-safe.
  */
 public class StateStoreProvider {
@@ -67,13 +70,60 @@ public class StateStoreProvider {
         String tableId = tableProperties.get(TABLE_ID);
         if (!tableIdToStateStoreCache.containsKey(tableId)) {
             if (tableIdToStateStoreCache.size() == cacheSize) {
-                tableIdToStateStoreCache.remove(tableIds.poll());
+                removeLeastRecentlyUsedStateStoreFromCache(tableId);
             }
             StateStore stateStore = stateStoreFactory.getStateStore(tableProperties);
             tableIdToStateStoreCache.put(tableId, stateStore);
-            tableIds.add(tableId);
         }
+        tableIds.remove(tableId);
+        tableIds.add(tableId);
         return tableIdToStateStoreCache.get(tableId);
+    }
+
+    /**
+     * Returns the Sleeper table IDs of the cached state stores.
+     *
+     * @return the Sleeper table IDs
+     */
+    public Set<String> getTableIdsOfCachedStateStores() {
+        return new HashSet<>(tableIdToStateStoreCache.keySet());
+    }
+
+    /**
+     * Remove the least recently used table's state store from the cache.
+     *
+     * @return the ID of the Sleeper table that was removed from the cache
+     */
+    public Optional<String> removeLeastRecentlyUsedStateStoreFromCache() {
+        return removeLeastRecentlyUsedStateStoreFromCache(Set.of());
+    }
+
+    /**
+     * Remove the least recently used table's state store from the cache.
+     *
+     * @param  tableIdToKeep the ID of a Sleeper table that should not be removed from the cache
+     * @return the ID of the Sleeper table that was removed from the cache
+     */
+    public Optional<String> removeLeastRecentlyUsedStateStoreFromCache(String tableIdToKeep) {
+        return removeLeastRecentlyUsedStateStoreFromCache(Set.of(tableIdToKeep));
+    }
+
+    /**
+     * Remove the least recently used table's state store from the cache.
+     *
+     * @param  tableIdsToKeep the IDs of the Sleeper tables that should not be removed from the cache
+     * @return the ID of the Sleeper table that was removed from the cache
+     */
+    public Optional<String> removeLeastRecentlyUsedStateStoreFromCache(Set<String> tableIdsToKeep) {
+        Optional<String> tableIdToRemove = tableIds.stream()
+            .filter(tableId -> !tableIdsToKeep.contains(tableId))
+            .findFirst();
+
+        if (tableIdToRemove.isPresent()) {
+            removeStateStoreFromCache(tableIdToRemove.get());
+        }
+
+        return tableIdToRemove;
     }
 
     /**

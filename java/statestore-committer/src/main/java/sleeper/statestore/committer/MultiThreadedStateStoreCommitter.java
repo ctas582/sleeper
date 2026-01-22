@@ -50,7 +50,7 @@ import sleeper.statestore.transactionlog.S3TransactionBodyStore;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -81,7 +81,6 @@ public class MultiThreadedStateStoreCommitter {
     private StateStoreCommitter committer;
     private PollWithRetries throttlingRetriesConfig;
     private long heapSpaceToKeepFree;
-    private LinkedList<String> processedTableOrder = new LinkedList<>();
     private Map<String, CompletableFuture<Instant>> tableFutures = new HashMap<>();
 
     public MultiThreadedStateStoreCommitter(S3Client s3Client, DynamoDbClient dynamoClient, SqsClient sqsClient, String configBucketName) {
@@ -212,8 +211,6 @@ public class MultiThreadedStateStoreCommitter {
                     });
 
                     tableFutures.put(tableId, task);
-                    processedTableOrder.remove(tableId);
-                    processedTableOrder.add(tableId);
                 });
             }
         } catch (Exception e) {
@@ -249,20 +246,21 @@ public class MultiThreadedStateStoreCommitter {
         while (availableMemory < heapSpaceToKeepFree) {
             LOGGER.info("Removing old state stores from cache as limited memory available: {}", FileUtils.byteCountToDisplaySize(availableMemory));
 
-            // Find a state store that we can remove from the in-mem cache that we haven't used for a while
-            Optional<String> tableIdToUncache = processedTableOrder.stream().filter(tableId -> {
-                // Don't remove a state store from the cache that we are about to use!
-                return !requiredTableIds.contains(tableId) &&
-                // Only remove a state store that we have finished using
-                        tableFutures.get(tableId).isDone();
-            }).findFirst();
+            Set<String> tableIdsToKeep = new HashSet<>();
+            // Don't remove a state store from the cache that we are about to use!
+            tableIdsToKeep.addAll(requiredTableIds);
+            // Don't remove a state store that we haven't finished using
+            tableIdsToKeep.addAll(tableFutures.entrySet().stream()
+                .filter(entry -> !entry.getValue().isDone())
+                .map(entry -> entry.getKey())
+                .collect(Collectors.toSet()));
 
-            if (tableIdToUncache.isPresent()) {
-                LOGGER.info("Removing state store for table {} from cache", tableIdToUncache.get());
-                stateStoreProvider.removeStateStoreFromCache(tableIdToUncache.get());
-                processedTableOrder.remove(tableIdToUncache.get());
+            Optional<String> tableIdRemovedFromCache = stateStoreProvider.removeLeastRecentlyUsedStateStoreFromCache(tableIdsToKeep);
+
+            if (tableIdRemovedFromCache.isPresent()) {
+                LOGGER.info("Removed state store for table {} from cache", tableIdRemovedFromCache.get());
             } else {
-                LOGGER.error("Couldn't find any candidate state stores to remove from memory. All must currently be in use, will wait and try again...");
+                LOGGER.warn("Couldn't find any candidate state stores to remove from memory. All must currently be in use, will wait and try again...");
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
