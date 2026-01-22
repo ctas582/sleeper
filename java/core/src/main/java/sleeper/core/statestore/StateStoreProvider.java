@@ -18,6 +18,7 @@ package sleeper.core.statestore;
 import sleeper.core.properties.instance.InstanceProperties;
 import sleeper.core.properties.table.TableProperties;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -114,7 +115,7 @@ public class StateStoreProvider {
      * @param  tableIdsToKeep the IDs of the Sleeper tables that should not be removed from the cache
      * @return the ID of the Sleeper table that was removed from the cache
      */
-    public Optional<String> removeLeastRecentlyUsedStateStoreFromCache(Set<String> tableIdsToKeep) {
+    public Optional<String> removeLeastRecentlyUsedStateStoreFromCache(Collection<String> tableIdsToKeep) {
         Optional<String> tableIdToRemove = tableIds.stream()
             .filter(tableId -> !tableIdsToKeep.contains(tableId))
             .findFirst();
