@@ -17,6 +17,7 @@ package sleeper.systemtest.drivers.instance;
 
 import sleeper.clients.deploy.DeployConfiguration;
 import sleeper.clients.deploy.DeployInstance;
+import sleeper.clients.deploy.VerifyPublishedArtefacts;
 import sleeper.clients.deploy.container.UploadDockerImages;
 import sleeper.clients.deploy.container.UploadDockerImages.CopyContainerImage;
 import sleeper.clients.deploy.container.UploadDockerImagesToEcr;
@@ -37,6 +38,7 @@ public class SystemTestDeploymentFactory {
         return new DeployInstance(
                 createSyncJars(parameters, clients),
                 createDockerUploader(parameters, clients),
+                new VerifyPublishedArtefacts(clients.getS3(), clients.getEcr()),
                 DeployInstance.WriteLocalProperties.underScriptsDirectory(parameters.getScriptsDirectory()),
                 createInvokeCdk(parameters, clients));
     }

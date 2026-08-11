@@ -18,8 +18,10 @@ package sleeper.bulkimport.starter.executor;
 
 import sleeper.core.deploy.ClientJar;
 import sleeper.core.properties.instance.InstanceProperties;
+import sleeper.core.properties.model.SleeperArtefactsLocation;
 
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.VERSION;
+import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_PREFIX;
 import static sleeper.core.properties.instance.CommonProperty.JARS_BUCKET;
 
 public class EmrJarLocation {
@@ -28,7 +30,8 @@ public class EmrJarLocation {
     }
 
     public static String getJarLocation(InstanceProperties instanceProperties) {
-        return "s3a://" + instanceProperties.get(JARS_BUCKET)
-                + "/" + ClientJar.BULK_IMPORT_RUNNER.getFormattedFilename(instanceProperties.get(VERSION));
+        String filename = ClientJar.BULK_IMPORT_RUNNER.getFormattedFilename(instanceProperties.get(VERSION));
+        String key = SleeperArtefactsLocation.applyPrefix(instanceProperties.get(ARTEFACTS_PREFIX), filename);
+        return "s3a://" + instanceProperties.get(JARS_BUCKET) + "/" + key;
     }
 }

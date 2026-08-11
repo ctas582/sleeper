@@ -17,6 +17,7 @@ package sleeper.core.deploy;
 
 import sleeper.core.SleeperVersion;
 import sleeper.core.properties.instance.InstanceProperties;
+import sleeper.core.properties.model.SleeperArtefactsLocation;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.ACCOUN
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.DNS_SUFFIX;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REGION;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.VERSION;
+import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_PREFIX;
 import static sleeper.core.properties.instance.CommonProperty.ECR_REPOSITORY_PREFIX;
 
 /**
@@ -181,7 +183,9 @@ public class LambdaJar {
      * @return                    the ECR repository name
      */
     public String getEcrRepositoryName(InstanceProperties instanceProperties) {
-        return instanceProperties.get(ECR_REPOSITORY_PREFIX) + "/" + imageName;
+        String artefactsPrefix = instanceProperties.get(ARTEFACTS_PREFIX);
+        return instanceProperties.get(ECR_REPOSITORY_PREFIX) + "/"
+                + SleeperArtefactsLocation.applyPrefix(artefactsPrefix, imageName);
     }
 
     /**

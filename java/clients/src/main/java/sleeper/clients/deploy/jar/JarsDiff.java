@@ -39,16 +39,25 @@ public class JarsDiff {
     }
 
     public static JarsDiff from(Path directory, List<Path> localFiles, ListObjectsV2Iterable listObjects) throws IOException {
-        return from(directory, localFiles, listObjects.stream()
+        return from(directory, localFiles, "", listObjects);
+    }
+
+    public static JarsDiff from(Path directory, List<Path> localFiles, String artefactsPrefix, ListObjectsV2Iterable listObjects) throws IOException {
+        String keyPrefix = artefactsPrefix == null || artefactsPrefix.isEmpty() ? "" : artefactsPrefix + "/";
+        return from(directory, localFiles, keyPrefix, listObjects.stream()
                 .flatMap(response -> response.contents().stream())
                 .map(object -> new S3KeyAndModifiedTime(object.key(), object.lastModified())));
     }
 
-    private static JarsDiff from(Path directory, List<Path> localFiles, Stream<S3KeyAndModifiedTime> s3Objects) throws IOException {
+    private static JarsDiff from(Path directory, List<Path> localFiles, String keyPrefix, Stream<S3KeyAndModifiedTime> s3Objects) throws IOException {
         List<String> deleteKeys = new ArrayList<>();
         Set<Path> uploadJars = new LinkedHashSet<>(localFiles);
         for (S3KeyAndModifiedTime object : (Iterable<? extends S3KeyAndModifiedTime>) s3Objects::iterator) {
-            Path path = directory.resolve(object.key);
+            String filename = stripPrefix(object.key, keyPrefix);
+            if (filename == null) {
+                continue;
+            }
+            Path path = directory.resolve(filename);
             if (isUnmodified(uploadJars, path, object)) {
                 uploadJars.remove(path);
             } else {
@@ -56,6 +65,20 @@ public class JarsDiff {
             }
         }
         return new JarsDiff(uploadJars, deleteKeys);
+    }
+
+    private static String stripPrefix(String key, String keyPrefix) {
+        if (keyPrefix.isEmpty()) {
+            return key;
+        }
+        if (!key.startsWith(keyPrefix)) {
+            return null;
+        }
+        String stripped = key.substring(keyPrefix.length());
+        if (stripped.contains("/")) {
+            return null;
+        }
+        return stripped;
     }
 
     private static boolean isUnmodified(Set<Path> set, Path jar, S3KeyAndModifiedTime object) throws IOException {

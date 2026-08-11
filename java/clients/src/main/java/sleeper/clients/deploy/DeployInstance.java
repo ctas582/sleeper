@@ -34,12 +34,14 @@ import sleeper.clients.util.cdk.InvokeCdk;
 import sleeper.core.deploy.SleeperInstanceConfiguration;
 import sleeper.core.properties.instance.InstanceProperties;
 import sleeper.core.properties.local.SaveLocalProperties;
+import sleeper.core.properties.model.ArtefactsMode;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_DEPLOYMENT_ID;
+import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_MODE;
 import static sleeper.core.properties.instance.CommonProperty.ID;
 import static sleeper.core.properties.instance.CommonProperty.SUBNETS;
 import static sleeper.core.properties.instance.CommonProperty.VPC_ID;
@@ -50,12 +52,16 @@ public class DeployInstance {
 
     private final SyncJars syncJars;
     private final UploadDockerImagesToEcr dockerImageUploader;
+    private final VerifyPublishedArtefacts verifyPublishedArtefacts;
     private final WriteLocalProperties writeLocalProperties;
     private final InvokeCdk invokeCdk;
 
-    public DeployInstance(SyncJars syncJars, UploadDockerImagesToEcr dockerImageUploader, WriteLocalProperties writeLocalProperties, InvokeCdk invokeCdk) {
+    public DeployInstance(SyncJars syncJars, UploadDockerImagesToEcr dockerImageUploader,
+            VerifyPublishedArtefacts verifyPublishedArtefacts,
+            WriteLocalProperties writeLocalProperties, InvokeCdk invokeCdk) {
         this.syncJars = syncJars;
         this.dockerImageUploader = dockerImageUploader;
+        this.verifyPublishedArtefacts = verifyPublishedArtefacts;
         this.writeLocalProperties = writeLocalProperties;
         this.invokeCdk = invokeCdk;
     }
@@ -67,6 +73,7 @@ public class DeployInstance {
                 new UploadDockerImagesToEcr(
                         UploadDockerImages.fromScriptsDirectory(scriptsDirectory, ecrClient),
                         account, region, partitionMetadata),
+                new VerifyPublishedArtefacts(s3Client, ecrClient),
                 DeployInstance.WriteLocalProperties.underScriptsDirectory(scriptsDirectory),
                 InvokeCdk.fromScriptsDirectory(scriptsDirectory));
     }
@@ -81,12 +88,18 @@ public class DeployInstance {
         LOGGER.info("instanceId: {}", instanceProperties.get(ID));
         LOGGER.info("vpcId: {}", instanceProperties.get(VPC_ID));
         LOGGER.info("subnetIds: {}", instanceProperties.get(SUBNETS));
-        if (!instanceProperties.isSet(ARTEFACTS_DEPLOYMENT_ID)) {
-            invokeCdk.invoke(ARTEFACTS, CdkCommand.deployArtefacts(instanceProperties.get(ID)));
+        ArtefactsMode artefactsMode = instanceProperties.getEnumValue(ARTEFACTS_MODE, ArtefactsMode.class);
+        if (artefactsMode == ArtefactsMode.PUBLISHED) {
+            LOGGER.info("Artefacts mode is published; skipping jar sync and Docker image upload");
+            verifyPublishedArtefacts.verify(instanceProperties, request.getCdkApp());
+        } else {
+            if (!instanceProperties.isSet(ARTEFACTS_DEPLOYMENT_ID)) {
+                invokeCdk.invoke(ARTEFACTS, CdkCommand.deployArtefacts(instanceProperties.get(ID)));
+            }
+            syncJars.sync(SyncJarsRequest.from(instanceProperties));
+            dockerImageUploader.upload(
+                    UploadDockerImagesToEcrRequest.forDeployment(instanceProperties, request.getCdkApp(), DockerImageConfiguration.getDefault()));
         }
-        syncJars.sync(SyncJarsRequest.from(instanceProperties));
-        dockerImageUploader.upload(
-                UploadDockerImagesToEcrRequest.forDeployment(instanceProperties, request.getCdkApp(), DockerImageConfiguration.getDefault()));
         Path configurationDirectory = writeLocalProperties.write(instanceConfig);
         LOGGER.info("-------------------------------------------------------");
         LOGGER.info("Deploying Stacks");

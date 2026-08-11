@@ -25,6 +25,7 @@ import software.amazon.awssdk.services.emrserverless.model.StartJobRunRequest;
 
 import sleeper.bulkimport.core.job.BulkImportJob;
 import sleeper.core.properties.instance.InstanceProperties;
+import sleeper.core.properties.model.SleeperArtefactsLocation;
 
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.BULK_IMPORT_BUCKET;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.BULK_IMPORT_EMR_SERVERLESS_APPLICATION_ID;
@@ -32,6 +33,7 @@ import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.BULK_I
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.BULK_IMPORT_EMR_SERVERLESS_CLUSTER_ROLE_ARN;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.CONFIG_BUCKET;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.VERSION;
+import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_PREFIX;
 import static sleeper.core.properties.instance.CommonProperty.JARS_BUCKET;
 
 /**
@@ -59,7 +61,9 @@ public class EmrServerlessPlatformExecutor implements PlatformExecutor {
                 .executionRoleArn(
                         instanceProperties.get(BULK_IMPORT_EMR_SERVERLESS_CLUSTER_ROLE_ARN))
                 .jobDriver(JobDriver.builder().sparkSubmit(SparkSubmit.builder()
-                        .entryPoint("s3://" + instanceProperties.get(JARS_BUCKET) + "/bulk-import-runner-" + instanceProperties.get(VERSION) + ".jar")
+                        .entryPoint("s3://" + instanceProperties.get(JARS_BUCKET) + "/"
+                                + SleeperArtefactsLocation.applyPrefix(instanceProperties.get(ARTEFACTS_PREFIX),
+                                        "bulk-import-runner-" + instanceProperties.get(VERSION) + ".jar"))
                         .entryPointArguments(instanceProperties.get(CONFIG_BUCKET),
                                 bulkImportJob.getId(), applicationName + "-EMRS", arguments.getJobRunId(), "EMR")
                         .sparkSubmitParameters(arguments.sparkSubmitParametersForServerless())

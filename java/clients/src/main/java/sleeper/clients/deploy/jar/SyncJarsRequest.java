@@ -23,18 +23,21 @@ import java.util.Objects;
 import java.util.function.Predicate;
 
 import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_DEPLOYMENT_ID;
+import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_PREFIX;
 import static sleeper.core.properties.instance.CommonProperty.JARS_BUCKET;
 
 public class SyncJarsRequest {
 
     private final String bucketName;
     private final String deploymentId;
+    private final String artefactsPrefix;
     private final Predicate<Path> uploadFilter;
     private final boolean deleteOldJars;
 
     private SyncJarsRequest(Builder builder) {
         bucketName = builder.bucketName;
         deploymentId = builder.deploymentId;
+        artefactsPrefix = SleeperArtefactsLocation.normalisePrefix(builder.artefactsPrefix);
         uploadFilter = Objects.requireNonNull(builder.uploadFilter, "uploadFilter must not be null");
         deleteOldJars = builder.deleteOldJars;
         if (bucketName == null && deploymentId == null) {
@@ -58,6 +61,10 @@ public class SyncJarsRequest {
         }
     }
 
+    public String getArtefactsPrefix() {
+        return artefactsPrefix;
+    }
+
     public Predicate<Path> getUploadFilter() {
         return uploadFilter;
     }
@@ -69,6 +76,7 @@ public class SyncJarsRequest {
     public static class Builder {
         private String bucketName;
         private String deploymentId;
+        private String artefactsPrefix;
         private Predicate<Path> uploadFilter = jar -> true;
         private boolean deleteOldJars = false;
 
@@ -79,6 +87,11 @@ public class SyncJarsRequest {
 
         public Builder deploymentId(String deploymentId) {
             this.deploymentId = deploymentId;
+            return this;
+        }
+
+        public Builder artefactsPrefix(String artefactsPrefix) {
+            this.artefactsPrefix = artefactsPrefix;
             return this;
         }
 
@@ -94,7 +107,8 @@ public class SyncJarsRequest {
 
         public Builder instanceProperties(InstanceProperties instanceProperties) {
             return bucketName(instanceProperties.get(JARS_BUCKET))
-                    .deploymentId(instanceProperties.get(ARTEFACTS_DEPLOYMENT_ID));
+                    .deploymentId(instanceProperties.get(ARTEFACTS_DEPLOYMENT_ID))
+                    .artefactsPrefix(instanceProperties.get(ARTEFACTS_PREFIX));
         }
 
         public SyncJarsRequest build() {

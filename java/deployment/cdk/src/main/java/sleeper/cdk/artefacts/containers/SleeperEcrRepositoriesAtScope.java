@@ -26,6 +26,12 @@ import sleeper.core.properties.instance.InstanceProperties;
 import java.util.HashMap;
 import java.util.Map;
 
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.ACCOUNT;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.PARTITION;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REGION;
+import static sleeper.core.properties.instance.CommonProperty.ECR_REPOSITORY_ACCOUNT;
+import static sleeper.core.properties.instance.CommonProperty.ECR_REPOSITORY_REGION;
+
 public class SleeperEcrRepositoriesAtScope {
     private final Construct scope;
     private final InstanceProperties instanceProperties;
@@ -38,22 +44,27 @@ public class SleeperEcrRepositoriesAtScope {
 
     public IRepository getRepository(LambdaJar jar) {
         return imageNameToRepository.computeIfAbsent(jar.getImageName(),
-                imageName -> createRepositoryReference(jar));
+                imageName -> createRepositoryReference(jar.getImageName() + "-repository",
+                        jar.getEcrRepositoryName(instanceProperties)));
     }
 
     public IRepository getRepository(DockerDeployment deployment) {
         return imageNameToRepository.computeIfAbsent(deployment.getDeploymentName(),
-                imageName -> createRepositoryReference(deployment));
+                imageName -> createRepositoryReference(deployment.getDeploymentName() + "-repository",
+                        deployment.getEcrRepositoryName(instanceProperties)));
     }
 
-    private IRepository createRepositoryReference(LambdaJar jar) {
-        String id = jar.getImageName() + "-repository";
-        return Repository.fromRepositoryName(scope, id, jar.getEcrRepositoryName(instanceProperties));
-    }
-
-    private IRepository createRepositoryReference(DockerDeployment deployment) {
-        String id = deployment.getDeploymentName() + "-repository";
-        return Repository.fromRepositoryName(scope, id, deployment.getEcrRepositoryName(instanceProperties));
+    private IRepository createRepositoryReference(String id, String repositoryName) {
+        String ecrAccount = instanceProperties.get(ECR_REPOSITORY_ACCOUNT);
+        String ecrRegion = instanceProperties.get(ECR_REPOSITORY_REGION);
+        if (ecrAccount == null && ecrRegion == null) {
+            return Repository.fromRepositoryName(scope, id, repositoryName);
+        }
+        String account = ecrAccount != null ? ecrAccount : instanceProperties.get(ACCOUNT);
+        String region = ecrRegion != null ? ecrRegion : instanceProperties.get(REGION);
+        String partition = instanceProperties.get(PARTITION);
+        String arn = "arn:" + partition + ":ecr:" + region + ":" + account + ":repository/" + repositoryName;
+        return Repository.fromRepositoryArn(scope, id, arn);
     }
 
 }

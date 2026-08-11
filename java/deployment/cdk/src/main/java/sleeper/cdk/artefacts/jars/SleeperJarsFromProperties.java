@@ -21,8 +21,10 @@ import software.amazon.awscdk.services.s3.IBucket;
 import software.constructs.Construct;
 
 import sleeper.core.properties.instance.InstanceProperties;
+import sleeper.core.properties.model.SleeperArtefactsLocation;
 
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.VERSION;
+import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_PREFIX;
 import static sleeper.core.properties.instance.CommonProperty.JARS_BUCKET;
 
 /**
@@ -42,7 +44,11 @@ public class SleeperJarsFromProperties implements SleeperJars {
     @Override
     public SleeperLambdaJars lambdaJarsAtScope(Construct scope) {
         IBucket bucket = Bucket.fromBucketName(scope, "LambdaJarsBucket", instanceProperties.get(JARS_BUCKET));
-        return jar -> Code.fromBucket(bucket, jar.getFilename(instanceProperties.get(VERSION)), versionIds.getLatestVersionId(jar));
+        String artefactsPrefix = instanceProperties.get(ARTEFACTS_PREFIX);
+        return jar -> {
+            String key = SleeperArtefactsLocation.applyPrefix(artefactsPrefix, jar.getFilename(instanceProperties.get(VERSION)));
+            return Code.fromBucket(bucket, key, versionIds.getLatestVersionId(jar));
+        };
     }
 
 }

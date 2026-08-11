@@ -17,6 +17,7 @@ package sleeper.core.deploy;
 
 import sleeper.core.properties.instance.InstanceProperties;
 import sleeper.core.properties.model.OptionalStack;
+import sleeper.core.properties.model.SleeperArtefactsLocation;
 import sleeper.core.properties.model.SleeperInternalCdkApp;
 import sleeper.core.properties.model.StateStoreCommitterPlatform;
 
@@ -29,6 +30,7 @@ import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.ACCOUN
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.DNS_SUFFIX;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REGION;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.VERSION;
+import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_PREFIX;
 import static sleeper.core.properties.instance.CommonProperty.ECR_REPOSITORY_PREFIX;
 
 /**
@@ -222,7 +224,9 @@ public class DockerDeployment {
      * @return                    the ECR repository name
      */
     public String getEcrRepositoryName(InstanceProperties instanceProperties) {
-        return instanceProperties.get(ECR_REPOSITORY_PREFIX) + "/" + deploymentName;
+        String artefactsPrefix = instanceProperties.get(ARTEFACTS_PREFIX);
+        return instanceProperties.get(ECR_REPOSITORY_PREFIX) + "/"
+                + SleeperArtefactsLocation.applyPrefix(artefactsPrefix, deploymentName);
     }
 
     @Override

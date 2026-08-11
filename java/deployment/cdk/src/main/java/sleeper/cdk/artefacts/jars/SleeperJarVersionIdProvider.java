@@ -21,11 +21,13 @@ import software.amazon.awssdk.services.s3.S3Client;
 
 import sleeper.core.deploy.LambdaJar;
 import sleeper.core.properties.instance.InstanceProperties;
+import sleeper.core.properties.model.SleeperArtefactsLocation;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.VERSION;
+import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_PREFIX;
 import static sleeper.core.properties.instance.CommonProperty.JARS_BUCKET;
 
 /**
@@ -62,10 +64,11 @@ public class SleeperJarVersionIdProvider {
         static GetVersionId fromJarsBucket(S3Client s3Client, InstanceProperties instanceProperties) {
             return jar -> {
                 String filename = jar.getFilename(instanceProperties.get(VERSION));
+                String key = SleeperArtefactsLocation.applyPrefix(instanceProperties.get(ARTEFACTS_PREFIX), filename);
                 String bucketName = instanceProperties.get(JARS_BUCKET);
-                LOGGER.info("Checking version ID for jar: {}", filename);
-                String versionId = s3Client.headObject(builder -> builder.bucket(bucketName).key(filename)).versionId();
-                LOGGER.info("Found latest version ID for jar {}: {}", filename, versionId);
+                LOGGER.info("Checking version ID for jar: {}", key);
+                String versionId = s3Client.headObject(builder -> builder.bucket(bucketName).key(key)).versionId();
+                LOGGER.info("Found latest version ID for jar {}: {}", key, versionId);
                 return versionId;
             };
         }

@@ -24,11 +24,14 @@ import software.amazon.awssdk.services.ecr.model.ImageDetail;
 import software.amazon.awssdk.services.ecr.model.ImageIdentifier;
 
 import sleeper.core.properties.instance.InstanceProperties;
+import sleeper.core.properties.model.ArtefactsMode;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.VERSION;
+import static sleeper.core.properties.instance.CommonProperty.ARTEFACTS_MODE;
 
 /**
  * Finds container images to deploy. Looks up the latest digest for each image in an ECR repository. The
@@ -56,7 +59,17 @@ public class SleeperContainerImageDigestProvider {
      * @return                    an image digest provider
      */
     public static SleeperContainerImageDigestProvider from(EcrClient ecrClient, InstanceProperties instanceProperties) {
+        if (isPublishedMode(instanceProperties)) {
+            LOGGER.info("Artefacts mode is published; pinning ECR image deployments to tag {} instead of digest",
+                    instanceProperties.get(VERSION));
+            return new SleeperContainerImageDigestProvider(GetDigest.fromVersionTag(instanceProperties));
+        }
         return new SleeperContainerImageDigestProvider(GetDigest.fromEcrRepository(ecrClient, instanceProperties));
+    }
+
+    private static boolean isPublishedMode(InstanceProperties instanceProperties) {
+        String mode = instanceProperties.get(ARTEFACTS_MODE);
+        return mode != null && ArtefactsMode.PUBLISHED.name().equalsIgnoreCase(mode.trim().toUpperCase(Locale.ROOT));
     }
 
     /**
@@ -108,6 +121,18 @@ public class SleeperContainerImageDigestProvider {
                 LOGGER.info("Found latest digest for image {}: {}", imageName, digest);
                 return digest;
             };
+        }
+
+        /**
+         * A GetDigest implementation that returns the configured Sleeper version as the tag or digest to deploy.
+         * Used when artefacts mode is published: the ECR image is expected to be immutable for a given version tag,
+         * and the digest lookup may not be possible (e.g. cross-account with no read access from CDK synth).
+         *
+         * @param  instanceProperties the instance properties
+         * @return                    the get digest implementation
+         */
+        static GetDigest fromVersionTag(InstanceProperties instanceProperties) {
+            return (imageName, ecrRepositoryName) -> instanceProperties.get(VERSION);
         }
     }
 

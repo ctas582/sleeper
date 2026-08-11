@@ -44,4 +44,41 @@ public class SleeperArtefactsLocation {
         return artefactsDeploymentId;
     }
 
+    /**
+     * Combines a base name with an optional artefacts prefix. Used to compose the S3 key of a jar file and the
+     * ECR repository name for a Docker image so that different tagged releases or branches can coexist in the same
+     * bucket or ECR namespace.
+     *
+     * @param  prefix   the artefacts prefix (may be null or empty)
+     * @param  baseName the resource name relative to the prefix
+     * @return          the prefix and base name joined with a slash, or just the base name if the prefix is empty
+     */
+    public static String applyPrefix(String prefix, String baseName) {
+        String normalised = normalisePrefix(prefix);
+        if (normalised.isEmpty()) {
+            return baseName;
+        }
+        return normalised + "/" + baseName;
+    }
+
+    /**
+     * Normalises an artefacts prefix by trimming whitespace and removing leading or trailing slashes.
+     *
+     * @param  prefix the value to normalise (may be null)
+     * @return        the normalised prefix, or an empty string if the value was null or empty
+     */
+    public static String normalisePrefix(String prefix) {
+        if (prefix == null) {
+            return "";
+        }
+        String trimmed = prefix.trim();
+        while (trimmed.startsWith("/")) {
+            trimmed = trimmed.substring(1);
+        }
+        while (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
+    }
+
 }

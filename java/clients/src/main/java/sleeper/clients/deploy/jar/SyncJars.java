@@ -21,6 +21,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.ObjectIdentifier;
 import software.amazon.awssdk.services.sts.StsClient;
 
+import sleeper.core.properties.model.SleeperArtefactsLocation;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -49,12 +51,13 @@ public class SyncJars {
     }
 
     public static void main(String[] args) throws IOException {
-        if (args.length < 2 || args.length > 3) {
-            throw new IllegalArgumentException("Usage: <jars-dir> <bucket-name> <optional-delete-old-jars>");
+        if (args.length < 2 || args.length > 4) {
+            throw new IllegalArgumentException("Usage: <jars-dir> <bucket-name> <optional-artefacts-prefix> <optional-delete-old-jars>");
         }
         Path jarsDirectory = Path.of(args[0]);
         String bucketName = args[1];
-        boolean deleteOldJars = optionalArgument(args, 2)
+        String artefactsPrefix = optionalArgument(args, 2).orElse(null);
+        boolean deleteOldJars = optionalArgument(args, 3)
                 .map(Boolean::parseBoolean)
                 .orElse(false);
         try (S3Client s3Client = S3Client.create();
@@ -63,6 +66,7 @@ public class SyncJars {
             new SyncJars(s3Client, accountName, jarsDirectory)
                     .sync(SyncJarsRequest.builder()
                             .bucketName(bucketName)
+                            .artefactsPrefix(artefactsPrefix)
                             .deleteOldJars(deleteOldJars)
                             .build());
         }
@@ -70,13 +74,20 @@ public class SyncJars {
 
     public boolean sync(SyncJarsRequest request) throws IOException {
         String bucketName = request.getBucketNameForAccount(accountName);
+        String artefactsPrefix = request.getArtefactsPrefix();
         boolean changed = false;
 
         List<Path> jars = listJarsInDirectory(jarsDirectory);
         LOGGER.info("Found {} jars in local directory", jars.size());
 
-        JarsDiff diff = JarsDiff.from(jarsDirectory, jars,
-                s3.listObjectsV2Paginator(builder -> builder.bucket(bucketName)));
+        String s3KeyPrefix = artefactsPrefix.isEmpty() ? "" : artefactsPrefix + "/";
+        JarsDiff diff = JarsDiff.from(jarsDirectory, jars, artefactsPrefix,
+                s3.listObjectsV2Paginator(builder -> {
+                    builder.bucket(bucketName);
+                    if (!s3KeyPrefix.isEmpty()) {
+                        builder.prefix(s3KeyPrefix);
+                    }
+                }));
         Collection<Path> uploadJars = diff.getModifiedAndNew().stream()
                 .filter(request.getUploadFilter())
                 .collect(Collectors.toUnmodifiableList());
@@ -95,10 +106,11 @@ public class SyncJars {
 
         LOGGER.info("Uploading {} jars", uploadJars.size());
         uploadJars.stream().parallel().forEach(jar -> {
-            LOGGER.info("Uploading jar: {}", jar.getFileName());
+            String key = SleeperArtefactsLocation.applyPrefix(artefactsPrefix, String.valueOf(jar.getFileName()));
+            LOGGER.info("Uploading jar: {} to key {}", jar.getFileName(), key);
             s3.putObject(builder -> builder
                     .bucket(bucketName)
-                    .key(String.valueOf(jar.getFileName())),
+                    .key(key),
                     jar);
             LOGGER.info("Finished uploading jar: {}", jar.getFileName());
         });

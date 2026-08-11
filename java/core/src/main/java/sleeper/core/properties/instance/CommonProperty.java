@@ -17,6 +17,7 @@
 package sleeper.core.properties.instance;
 
 import sleeper.core.properties.SleeperPropertyIndex;
+import sleeper.core.properties.model.ArtefactsMode;
 import sleeper.core.properties.model.LambdaDeployType;
 import sleeper.core.properties.model.OptionalStack;
 import sleeper.core.properties.model.SleeperArtefactsLocation;
@@ -47,18 +48,58 @@ public interface CommonProperty {
             .validationPredicate(Objects::nonNull)
             .propertyGroup(InstancePropertyGroup.COMMON)
             .runCdkDeployWhenChanged(true).build();
+    UserDefinedInstanceProperty ARTEFACTS_MODE = Index.propertyBuilder("sleeper.artefacts.mode")
+            .description("How Sleeper deployment artefacts (jars and container images) are sourced. Not case sensitive.\n" +
+                    "If `build`, the deploy client will build (or download from a remote repository) and upload " +
+                    "artefacts to the referenced S3 bucket and ECR repositories on every deployment.\n" +
+                    "If `published`, the artefacts have already been published into the referenced S3 bucket and " +
+                    "ECR repositories, and the deploy client will not build or upload them. Use with a tagged release " +
+                    "or shared branch build. The properties `sleeper.jars.bucket` and `sleeper.ecr.repository.prefix` " +
+                    "must be set explicitly in this mode. `sleeper.artefacts.prefix` and `sleeper.ecr.repository.account` " +
+                    "may also be set to point at a cross-account release location.\n" +
+                    "Valid values: " + SleeperPropertyValueUtils.describeEnumValuesInLowerCase(ArtefactsMode.class))
+            .defaultValue(ArtefactsMode.BUILD.toString().toLowerCase(Locale.ROOT))
+            .validationPredicate(ArtefactsMode::isValid)
+            .propertyGroup(InstancePropertyGroup.COMMON)
+            .editable(false).build();
+    UserDefinedInstanceProperty ARTEFACTS_PREFIX = Index.propertyBuilder("sleeper.artefacts.prefix")
+            .description("A unifying namespace prefix applied to artefact locations for both jars and Docker images. " +
+                    "When set, jars are looked up in S3 at `<sleeper.jars.bucket>/<prefix>/<jar filename>` and ECR " +
+                    "repositories are named `<sleeper.ecr.repository.prefix>/<prefix>/<image name>`.\n" +
+                    "Typical values are a version number (e.g. `v1.0.0`) for tagged releases or `branches/<branch>` " +
+                    "for branch builds. Leading and trailing slashes are stripped.\n" +
+                    "If unset, artefacts are read from and written to the root of the jars bucket and directly under " +
+                    "the ECR repository prefix. Note that `sleeper.userjars` are always read from the root of " +
+                    "`sleeper.jars.bucket` and are not affected by this property.")
+            .propertyGroup(InstancePropertyGroup.COMMON)
+            .runCdkDeployWhenChanged(true).build();
     UserDefinedInstanceProperty JARS_BUCKET = Index.propertyBuilder("sleeper.jars.bucket")
             .description("The S3 bucket containing the jar files of the Sleeper components. If unset, it will be set " +
                     "by the CDK during deployment, based on `sleeper.artefacts.deployment` if it is set, or " +
-                    "`sleeper.id` if it is not.")
+                    "`sleeper.id` if it is not.\n" +
+                    "See also `sleeper.artefacts.prefix` for a namespace within the bucket.")
             .propertyGroup(InstancePropertyGroup.COMMON)
             .runCdkDeployWhenChanged(true).build();
     UserDefinedInstanceProperty ECR_REPOSITORY_PREFIX = Index.propertyBuilder("sleeper.ecr.repository.prefix")
             .description("If set, this property will be used as a prefix for the names of ECR repositories. " +
                     "If unset, a default prefix is computed from `sleeper.artefacts.deployment` if it is set, or " +
                     "`sleeper.id` if it is not.\n" +
-                    "ECR repository names are generated in the format `<prefix>/<image name>`.")
+                    "ECR repository names are generated in the format `<prefix>/<image name>`, or " +
+                    "`<prefix>/<sleeper.artefacts.prefix>/<image name>` if `sleeper.artefacts.prefix` is set.")
             .defaultProperty(ARTEFACTS_DEPLOYMENT_ID, SleeperArtefactsLocation::getDefaultEcrRepositoryPrefix)
+            .propertyGroup(InstancePropertyGroup.COMMON)
+            .runCdkDeployWhenChanged(true).build();
+    UserDefinedInstanceProperty ECR_REPOSITORY_ACCOUNT = Index.propertyBuilder("sleeper.ecr.repository.account")
+            .description("The AWS account that hosts the ECR repositories containing the Sleeper Docker images. If " +
+                    "unset, the account that the instance is being deployed into is used. Set this to point at a " +
+                    "cross-account release ECR. The referenced ECR repositories must grant read (pull) access to the " +
+                    "deploying account's Lambda and ECS task execution roles.")
+            .propertyGroup(InstancePropertyGroup.COMMON)
+            .runCdkDeployWhenChanged(true).build();
+    UserDefinedInstanceProperty ECR_REPOSITORY_REGION = Index.propertyBuilder("sleeper.ecr.repository.region")
+            .description("The AWS region where the ECR repositories containing the Sleeper Docker images are hosted. " +
+                    "If unset, the region that the instance is being deployed into is used. Set this when the release " +
+                    "ECR lives in a different region from the instance.")
             .propertyGroup(InstancePropertyGroup.COMMON)
             .runCdkDeployWhenChanged(true).build();
     UserDefinedInstanceProperty USER_JARS = Index.propertyBuilder("sleeper.userjars")
