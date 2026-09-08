@@ -249,7 +249,7 @@
 	cursor: pointer;
 }
 
-.ingest-file-method span {
+.ingest-file-method > span {
 	display: flex;
 	flex-direction: column;
 	gap: 0.15rem;
@@ -257,6 +257,31 @@
 
 .ingest-file-method-hint {
 	font-size: 0.8rem;
+	color: #6b7280;
+}
+
+.ingest-file-method.disabled {
+	background: #f9fafb;
+	cursor: not-allowed;
+}
+
+.ingest-file-method.disabled input,
+.ingest-file-method.disabled strong {
+	cursor: not-allowed;
+	color: #6b7280;
+}
+
+.ingest-file-method-disabled-hint {
+	font-size: 0.75rem;
+	color: #9ca3af;
+}
+
+.ingest-file-method-disabled-hint code {
+	font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+	font-size: 0.72rem;
+	padding: 0.05rem 0.25rem;
+	background: #f3f4f6;
+	border-radius: 3px;
 	color: #6b7280;
 }
 
@@ -312,4 +337,20 @@
 	padding-left: 1.1rem;
 	font-size: 0.9rem;
 	color: #374151;
+}
+
+.ingest-file-success-job {
+	display: block;
+	font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+	font-size: 0.75rem;
+	color: #6b7280;
+}
+
+.ingest-file-success-job a {
+	color: #1a56db;
+}
+
+.ingest-file-success-note {
+	color: #6b7280;
+	font-size: 0.85rem;
 }

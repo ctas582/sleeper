@@ -28,16 +28,22 @@ import software.amazon.awssdk.services.s3.model.CreateBucketRequest;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.Message;
 
+import sleeper.bulkimport.core.job.BulkImportJob;
+import sleeper.bulkimport.core.job.BulkImportJobSerDe;
 import sleeper.configuration.properties.S3InstanceProperties;
 import sleeper.configuration.properties.S3TableProperties;
 import sleeper.configuration.table.index.DynamoDBTableIndexCreator;
 import sleeper.core.properties.instance.InstanceProperties;
+import sleeper.core.properties.instance.InstanceProperty;
 import sleeper.core.properties.model.OptionalStack;
 import sleeper.core.properties.table.TableProperties;
 import sleeper.ingest.batcher.core.IngestBatcherSubmitRequest;
 import sleeper.ingest.batcher.core.IngestBatcherSubmitRequestSerDe;
+import sleeper.ingest.core.job.IngestJob;
+import sleeper.ingest.core.job.IngestJobSerDe;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static io.restassured.RestAssured.given;
@@ -45,8 +51,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.BULK_IMPORT_EMR_SERVERLESS_JOB_QUEUE_URL;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.CONFIG_BUCKET;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.INGEST_BATCHER_SUBMIT_QUEUE_URL;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.INGEST_JOB_QUEUE_URL;
 import static sleeper.core.properties.instance.CommonProperty.OPTIONAL_STACKS;
 import static sleeper.core.properties.table.TableProperty.TABLE_ID;
 import static sleeper.core.properties.table.TableProperty.TABLE_NAME;
@@ -87,20 +97,34 @@ class IngestFileResourceIT {
         LocalStackTestResources.deleteSqsQueues(sqsClient);
     }
 
+    private static final Map<OptionalStack, InstanceProperty> QUEUE_URL_BY_STACK = Map.of(
+            OptionalStack.IngestBatcherStack, INGEST_BATCHER_SUBMIT_QUEUE_URL,
+            OptionalStack.IngestStack, INGEST_JOB_QUEUE_URL,
+            OptionalStack.EmrServerlessBulkImportStack, BULK_IMPORT_EMR_SERVERLESS_JOB_QUEUE_URL);
+
     private InstanceProperties setUpInstance(boolean batcherEnabled) {
+        return setUpInstance(batcherEnabled ? List.of(OptionalStack.IngestBatcherStack) : List.of());
+    }
+
+    private InstanceProperties setUpInstance(List<OptionalStack> stacks) {
         InstanceProperties instanceProperties = createTestInstancePropertiesWithId(INSTANCE_ID);
-        instanceProperties.setEnumList(OPTIONAL_STACKS,
-                batcherEnabled ? List.of(OptionalStack.IngestBatcherStack) : List.of());
+        instanceProperties.setEnumList(OPTIONAL_STACKS, stacks);
         s3Client.createBucket(CreateBucketRequest.builder()
                 .bucket(instanceProperties.get(CONFIG_BUCKET))
                 .build());
-        if (batcherEnabled) {
-            String queueUrl = sqsClient.createQueue(builder -> builder.queueName("ingest-file-it-submit")).queueUrl();
-            instanceProperties.set(INGEST_BATCHER_SUBMIT_QUEUE_URL, queueUrl);
+        for (OptionalStack stack : stacks) {
+            String queueName = "ingest-file-it-" + stack.name().toLowerCase(Locale.ROOT);
+            String queueUrl = sqsClient.createQueue(builder -> builder.queueName(queueName)).queueUrl();
+            instanceProperties.set(QUEUE_URL_BY_STACK.get(stack), queueUrl);
         }
         S3InstanceProperties.saveToS3(s3Client, instanceProperties);
         DynamoDBTableIndexCreator.create(dynamoDbClient, instanceProperties);
         return instanceProperties;
+    }
+
+    private List<Message> receiveMessages(InstanceProperties instanceProperties, InstanceProperty queueUrlProperty) {
+        String queueUrl = instanceProperties.get(queueUrlProperty);
+        return sqsClient.receiveMessage(builder -> builder.queueUrl(queueUrl).maxNumberOfMessages(10)).messages();
     }
 
     private TableProperties createTable(InstanceProperties instanceProperties, String tableName) {
@@ -213,14 +237,72 @@ class IngestFileResourceIT {
                 .statusCode(201)
                 .body("method", is("ingest_batcher"))
                 .body("submitted[0].tableName", is("table-1"))
-                .body("submitted[0].fileCount", is(1));
+                .body("submitted[0].fileCount", is(1))
+                .body("submitted[0].jobId", is(nullValue()));
 
-        String queueUrl = instanceProperties.get(INGEST_BATCHER_SUBMIT_QUEUE_URL);
-        List<Message> messages = sqsClient.receiveMessage(builder -> builder.queueUrl(queueUrl).maxNumberOfMessages(10))
-                .messages();
+        List<Message> messages = receiveMessages(instanceProperties, INGEST_BATCHER_SUBMIT_QUEUE_URL);
         assertThat(messages).hasSize(1);
         IngestBatcherSubmitRequest request = new IngestBatcherSubmitRequestSerDe().fromJson(messages.get(0).body());
         assertThat(request).isEqualTo(new IngestBatcherSubmitRequest("table-1", files));
+    }
+
+    @Test
+    void shouldSubmitFilesToTheStandardIngestQueue() {
+        InstanceProperties instanceProperties = setUpInstance(List.of(OptionalStack.IngestStack));
+        TableProperties table = createTable(instanceProperties, "table-1");
+        String tableId = table.get(TABLE_ID);
+        List<String> files = List.of(DATA_BUCKET + "/data/part-0.parquet");
+
+        String jobId = given().contentType("application/json")
+                .body(Map.of("files", files, "tableIds", List.of(tableId), "method", "standard_ingest"))
+                .when().post("/api/ingest-file/submit")
+                .then()
+                .statusCode(201)
+                .body("method", is("standard_ingest"))
+                .body("submitted[0].tableName", is("table-1"))
+                .body("submitted[0].jobId", is(notNullValue()))
+                .extract().path("submitted[0].jobId");
+
+        List<Message> messages = receiveMessages(instanceProperties, INGEST_JOB_QUEUE_URL);
+        assertThat(messages).hasSize(1);
+        IngestJob job = new IngestJobSerDe().fromJson(messages.get(0).body());
+        assertThat(job).isEqualTo(IngestJob.builder().id(jobId).tableId(tableId).files(files).build());
+    }
+
+    @Test
+    void shouldSubmitFilesToABulkImportQueue() {
+        InstanceProperties instanceProperties = setUpInstance(List.of(OptionalStack.EmrServerlessBulkImportStack));
+        TableProperties table = createTable(instanceProperties, "table-1");
+        String tableId = table.get(TABLE_ID);
+        List<String> files = List.of(DATA_BUCKET + "/data/part-0.parquet");
+
+        String jobId = given().contentType("application/json")
+                .body(Map.of("files", files, "tableIds", List.of(tableId), "method", "bulk_import_emr_serverless"))
+                .when().post("/api/ingest-file/submit")
+                .then()
+                .statusCode(201)
+                .body("method", is("bulk_import_emr_serverless"))
+                .body("submitted[0].jobId", is(notNullValue()))
+                .extract().path("submitted[0].jobId");
+
+        List<Message> messages = receiveMessages(instanceProperties, BULK_IMPORT_EMR_SERVERLESS_JOB_QUEUE_URL);
+        assertThat(messages).hasSize(1);
+        BulkImportJob job = new BulkImportJobSerDe().fromJson(messages.get(0).body());
+        assertThat(job).isEqualTo(BulkImportJob.builder().id(jobId).tableId(tableId).files(files).build());
+    }
+
+    @Test
+    void shouldReturn404WhenTheSelectedMethodsStackIsNotEnabled() {
+        InstanceProperties instanceProperties = setUpInstance(List.of(OptionalStack.IngestBatcherStack));
+        TableProperties table = createTable(instanceProperties, "table-1");
+
+        given().contentType("application/json")
+                .body(Map.of("files", List.of(DATA_BUCKET + "/f.parquet"),
+                        "tableIds", List.of(table.get(TABLE_ID)), "method", "standard_ingest"))
+                .when().post("/api/ingest-file/submit")
+                .then()
+                .statusCode(404)
+                .body("error", is("ingest_not_enabled"));
     }
 
     @Test
@@ -248,4 +330,5 @@ class IngestFileResourceIT {
                 .then()
                 .statusCode(400);
     }
+
 }

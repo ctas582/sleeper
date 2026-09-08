@@ -32,12 +32,16 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
+import sleeper.api.IngestMethod;
+import sleeper.bulkimport.core.configuration.BulkImportPlatform;
+import sleeper.bulkimport.core.job.BulkImportJob;
+import sleeper.bulkimport.core.job.BulkImportJobSerDe;
 import sleeper.configuration.properties.S3InstanceProperties;
 import sleeper.configuration.properties.S3TableProperties;
 import sleeper.configuration.table.index.DynamoDBTableIndex;
 import sleeper.configuration.utils.S3Path;
 import sleeper.core.properties.instance.InstanceProperties;
-import sleeper.core.properties.model.OptionalStack;
+import sleeper.core.properties.model.IngestQueue;
 import sleeper.core.properties.table.TableProperties;
 import sleeper.core.properties.table.TablePropertiesProvider;
 import sleeper.core.schema.Schema;
@@ -45,22 +49,23 @@ import sleeper.core.table.TableIndex;
 import sleeper.core.table.TableStatus;
 import sleeper.ingest.batcher.core.IngestBatcherSubmitRequest;
 import sleeper.ingest.batcher.core.IngestBatcherSubmitRequestSerDe;
+import sleeper.ingest.core.job.IngestJob;
+import sleeper.ingest.core.job.IngestJobSerDe;
 import sleeper.parquet.row.SchemaConverter;
 import sleeper.parquet.utils.HadoopConfigurationProvider;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static sleeper.api.ResourceUtils.notAvailable;
+import static sleeper.api.ResourceUtils.loadPropertiesAndCheckStackEnabled;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.INGEST_BATCHER_SUBMIT_QUEUE_URL;
-import static sleeper.core.properties.instance.CommonProperty.OPTIONAL_STACKS;
 
 @Path("/api/ingest-file")
 public class IngestFileResource {
-
-    public static final String METHOD_INGEST_BATCHER = "ingest_batcher";
 
     private final S3Client s3Client;
     private final DynamoDbClient dynamoDbClient;
@@ -206,43 +211,81 @@ public class IngestFileResource {
         if (request.tableIds() == null || request.tableIds().isEmpty()) {
             throw new WebApplicationException("Request must include at least one table", Response.Status.BAD_REQUEST);
         }
-        String method = request.method() == null ? METHOD_INGEST_BATCHER : request.method();
-        if (!METHOD_INGEST_BATCHER.equals(method)) {
-            throw new WebApplicationException("Unsupported ingest method: " + method, Response.Status.BAD_REQUEST);
-        }
+        IngestMethod method = readMethod(request.method());
 
-        InstanceProperties instanceProperties = S3InstanceProperties.loadGivenAccountAndInstanceId(s3Client, accountName, instanceId);
-
-        if (!ingestBatcherEnabled(instanceProperties)) {
-            throw notAvailable("ingest_batcher_not_enabled", "The ingest batcher is not enabled for this instance.");
-        }
-
+        InstanceProperties instanceProperties = loadPropertiesAndCheckStackEnabled(s3Client, accountName, instanceId, method.getOptionalStack());
         TableIndex tableIndex = new DynamoDBTableIndex(instanceProperties, dynamoDbClient);
-        IngestBatcherSubmitRequestSerDe serDe = new IngestBatcherSubmitRequestSerDe();
-        String queueUrl = instanceProperties.get(INGEST_BATCHER_SUBMIT_QUEUE_URL);
 
         List<SubmittedTable> submitted = new ArrayList<>();
         for (String tableId : request.tableIds()) {
             TableStatus table = tableIndex.getTableByUniqueId(tableId)
                     .orElseThrow(() -> new WebApplicationException("Table not found: " + tableId, Response.Status.BAD_REQUEST));
-            IngestBatcherSubmitRequest submitRequest = new IngestBatcherSubmitRequest(table.getTableName(), request.files());
-            sqsClient.sendMessage(send -> send.queueUrl(queueUrl).messageBody(serDe.toJson(submitRequest)));
-            submitted.add(new SubmittedTable(table.getTableName(), request.files().size()));
+            String jobId = send(method, instanceProperties, table, request.files());
+            submitted.add(new SubmittedTable(table.getTableName(), request.files().size(), jobId));
         }
 
         return Response.status(Response.Status.CREATED)
-                .entity(new SubmitResponse(submitted, method))
+                .entity(new SubmitResponse(submitted, method.getWireName()))
                 .build();
     }
 
-    public record SubmitRequest(List<String> files, List<String> tableIds, String method) {}
-    public record SubmittedTable(String tableName, int fileCount) {}
-    public record SubmitResponse(List<SubmittedTable> submitted, String method) {}
-
-    private static boolean ingestBatcherEnabled(InstanceProperties instanceProperties) {
-        return instanceProperties.getEnumList(OPTIONAL_STACKS, OptionalStack.class)
-                .contains(OptionalStack.IngestBatcherStack);
+    private static IngestMethod readMethod(String method) {
+        if (method == null) {
+            return IngestMethod.INGEST_BATCHER;
+        }
+        try {
+            return IngestMethod.fromWireName(method);
+        } catch (IllegalArgumentException e) {
+            throw new WebApplicationException(e.getMessage(), Response.Status.BAD_REQUEST);
+        }
     }
+
+    /**
+     * Sends the files to the queue for the chosen ingest method.
+     *
+     * @param  method             the ingest method
+     * @param  instanceProperties the instance properties
+     * @param  table              the table to ingest into
+     * @param  files              the files to ingest
+     * @return                    the id of the job that was created, or null when the ingest batcher will create the
+     *                            job later
+     */
+    private String send(IngestMethod method, InstanceProperties instanceProperties, TableStatus table, List<String> files) {
+        if (method == IngestMethod.INGEST_BATCHER) {
+            // The batcher tracks files by table name, and assigns them a job id once it creates a job.
+            IngestBatcherSubmitRequest submitRequest = new IngestBatcherSubmitRequest(table.getTableName(), files);
+            sendMessage(instanceProperties.get(INGEST_BATCHER_SUBMIT_QUEUE_URL),
+                    new IngestBatcherSubmitRequestSerDe().toJson(submitRequest));
+            return null;
+        }
+
+        String jobId = UUID.randomUUID().toString();
+        Optional<BulkImportPlatform> platform = method.getBulkImportPlatform();
+        if (platform.isPresent()) {
+            BulkImportJob job = BulkImportJob.builder()
+                    .id(jobId)
+                    .tableId(table.getTableUniqueId())
+                    .files(files)
+                    .build();
+            sendMessage(platform.get().getBulkImportQueueUrl(instanceProperties), new BulkImportJobSerDe().toJson(job));
+        } else {
+            IngestJob job = IngestJob.builder()
+                    .id(jobId)
+                    .tableId(table.getTableUniqueId())
+                    .files(files)
+                    .build();
+            sendMessage(IngestQueue.STANDARD_INGEST.getJobQueueUrl(instanceProperties), new IngestJobSerDe().toJson(job));
+        }
+        return jobId;
+    }
+
+    private void sendMessage(String queueUrl, String body) {
+        sqsClient.sendMessage(send -> send.queueUrl(queueUrl).messageBody(body));
+    }
+
+    public record SubmitRequest(List<String> files, List<String> tableIds, String method) {}
+    public record SubmittedTable(String tableName, int fileCount, String jobId) {}
+    public record SubmitResponse(List<SubmittedTable> submitted, String method) {}
 
     private static String stripScheme(String path) {
         int schemeEnd = path.indexOf("//");

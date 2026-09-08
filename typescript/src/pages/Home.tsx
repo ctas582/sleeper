@@ -5,6 +5,7 @@ import Title from '../components/Title'
 import HelpIcon from '../components/icons/HelpIcon'
 import type { InstanceFeatures, TableStatus } from '../contexts/InstanceContext'
 import { FEATURES, FEATURE_GROUPS, type FeatureIcon, type FeatureInfo, type FeatureName } from '../lib/features'
+import { INGEST_METHOD_FEATURES } from '../lib/ingestMethods'
 import { useSelectedTable } from '../hooks/useSelectedTable'
 import './Home.css'
 
@@ -20,7 +21,7 @@ interface QuickStartStep {
 	label: string
 	description: string
 	icon: FeatureIcon
-	feature?: FeatureName
+	features?: FeatureName[]
 	needsTable: boolean
 }
 
@@ -37,7 +38,7 @@ const QUICK_START: QuickStartStep[] = [
 		label: 'Ingest some data',
 		description: 'Submit Parquet files in S3 to be written into a table.',
 		icon: AmazonSimpleQueueService,
-		feature: 'IngestBatcherStack',
+		features: INGEST_METHOD_FEATURES,
 		needsTable: true,
 	},
 	{
@@ -45,7 +46,7 @@ const QUICK_START: QuickStartStep[] = [
 		label: 'Run a query',
 		description: 'Look up rows by their row key and see the results.',
 		icon: AwsLambda,
-		feature: 'QueryStack',
+		features: ['QueryStack'],
 		needsTable: true,
 	},
 ]
@@ -57,7 +58,7 @@ function disabledReason(
 	loading: boolean,
 ): string | null {
 	if (!features) return loading ? 'Loading…' : 'Instance unavailable'
-	if (step.feature && !features[step.feature]) return 'Not enabled for this instance'
+	if (step.features && !step.features.some(f => features[f])) return 'Not enabled for this instance'
 	if (step.needsTable && (!tables || tables.length === 0)) return 'Create a table first'
 	return null
 }

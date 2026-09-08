@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { postJson } from '../lib/api'
 import { AmazonSimpleStorageService } from '@aws-icons/react/architecture-service'
 import { s3ConsoleHomeUrl, s3ConsoleUrl } from '../lib/aws'
-import { useInstance } from '../contexts/InstanceContext'
+import { useInstance, type InstanceFeatures } from '../contexts/InstanceContext'
 import { formatBytes } from '../lib/dataMetrics'
+import { enableInstruction } from '../lib/features'
+import {
+	INGEST_METHODS,
+	ingestMethodLabel,
+	initialIngestMethod,
+	isIngestMethodEnabled,
+	type IngestMethod,
+} from '../lib/ingestMethods'
 import './IngestFileWizard.css'
-
-export type IngestMethod = 'ingest_batcher'
-
-const METHOD_LABELS: Record<IngestMethod, string> = {
-	ingest_batcher: 'Ingest Batcher',
-}
 
 interface Props {
 	onClose: () => void
@@ -51,6 +54,7 @@ interface InspectResponse {
 interface SubmittedTable {
 	tableName: string
 	fileCount: number
+	jobId: string | null
 }
 
 interface SubmitResponse {
@@ -84,7 +88,7 @@ export default function IngestFileWizard({ onClose, onSubmitted, defaultMethod =
 
 	const [inspect, setInspect] = useState<InspectResponse | null>(null)
 	const [selectedTableIds, setSelectedTableIds] = useState<string[]>([])
-	const [method, setMethod] = useState<IngestMethod>(defaultMethod)
+	const [method, setMethod] = useState<IngestMethod>(() => initialIngestMethod(defaultMethod, features))
 
 	const [stepError, setStepError] = useState<string | null>(null)
 	const [checking, setChecking] = useState(false)
@@ -99,6 +103,11 @@ export default function IngestFileWizard({ onClose, onSubmitted, defaultMethod =
 		window.addEventListener('keydown', onKey)
 		return () => window.removeEventListener('keydown', onKey)
 	}, [onClose])
+
+	useEffect(() => {
+		if (!features) return
+		setMethod(current => initialIngestMethod(current, features))
+	}, [features])
 
 	const allFiles = useMemo(() => expanded?.paths.flatMap((p) => p.files) ?? [], [expanded])
 	const selectedFiles = useMemo(() => allFiles.filter((f) => included[f.file]).map((f) => f.file), [allFiles, included])
@@ -186,8 +195,9 @@ export default function IngestFileWizard({ onClose, onSubmitted, defaultMethod =
 		}
 
 		if (step === 3) {
-			if (method === 'ingest_batcher' && !features?.IngestBatcherStack) {
-				setStepError('The ingest batcher is not enabled for this instance.')
+			const selected = INGEST_METHODS.find(m => m.key === method)
+			if (!selected || !isIngestMethodEnabled(selected, features)) {
+				setStepError(`${ingestMethodLabel(method)} is not enabled for this instance.`)
 				return
 			}
 			setStep(4)
@@ -238,15 +248,32 @@ export default function IngestFileWizard({ onClose, onSubmitted, defaultMethod =
 						<p>
 							Submitted <strong>{totalFiles}</strong> file{totalFiles === 1 ? '' : 's'} to{' '}
 							<strong>{success.submitted.length}</strong> table{success.submitted.length === 1 ? '' : 's'} via{' '}
-							<strong>{METHOD_LABELS[success.method as IngestMethod] ?? success.method}</strong>.
+							<strong>{ingestMethodLabel(success.method)}</strong>.
 						</p>
 						<ul className="ingest-file-success-list">
 							{success.submitted.map((s) => (
 								<li key={s.tableName}>
 									<strong>{s.tableName}</strong> — {s.fileCount} file{s.fileCount === 1 ? '' : 's'}
+									{s.jobId && (
+										<span className="ingest-file-success-job">
+											{features?.IngestTracking ? (
+												<Link to={`/ingest-jobs/${encodeURIComponent(s.jobId)}`} onClick={onClose}>
+													{s.jobId}
+												</Link>
+											) : (
+												<code>{s.jobId}</code>
+											)}
+										</span>
+									)}
 								</li>
 							))}
 						</ul>
+						{success.method === 'ingest_batcher' && (
+							<p className="ingest-file-success-note">
+								The batcher will create a job for these files once it has enough data, or once they have been
+								waiting long enough.
+							</p>
+						)}
 					</div>
 					<div className="modal-actions">
 						<span style={{ flex: 1 }} />
@@ -305,7 +332,7 @@ export default function IngestFileWizard({ onClose, onSubmitted, defaultMethod =
 						/>
 					)}
 					{step === 3 && (
-						<MethodStep method={method} onChange={setMethod} batcherEnabled={!!features?.IngestBatcherStack} />
+						<MethodStep method={method} onChange={setMethod} features={features} />
 					)}
 					{step === 4 && (
 						<ReviewStep
@@ -496,38 +523,50 @@ function TablesStep({
 function MethodStep({
 	method,
 	onChange,
-	batcherEnabled,
+	features,
 }: {
 	method: IngestMethod
 	onChange: (m: IngestMethod) => void
-	batcherEnabled: boolean
+	features: InstanceFeatures | null
 }) {
+	const noneEnabled = features !== null && !INGEST_METHODS.some(m => isIngestMethodEnabled(m, features))
 	return (
 		<div className="ingest-file-field-block">
 			<p className="modal-description">Choose how the files should be ingested into Sleeper.</p>
-			{!batcherEnabled && (
+			{noneEnabled && (
 				<div className="ingest-file-unavailable">
-					<p>The Ingest Batcher component isn't available for this instance.</p>
+					<p>No ingest methods are available for this instance.</p>
 					<p>
-						To enable it, add <code>IngestBatcherStack</code> to the <code>sleeper.optional.stacks</code> instance
+						To enable one, add an ingest or bulk import stack to the <code>sleeper.optional.stacks</code> instance
 						property, then redeploy the instance.
 					</p>
 				</div>
 			)}
-			<label className="ingest-file-method">
-				<input
-					type="radio"
-					name="ingest-method"
-					value="ingest_batcher"
-					checked={method === 'ingest_batcher'}
-					onChange={() => onChange('ingest_batcher')}
-					disabled={!batcherEnabled}
-				/>
-				<span>
-					<strong>{METHOD_LABELS.ingest_batcher}</strong>
-					<span className="ingest-file-method-hint">Files are batched into ingest jobs by the ingest batcher.</span>
-				</span>
-			</label>
+			{INGEST_METHODS.map(m => {
+				const enabled = isIngestMethodEnabled(m, features)
+				const { value, property } = enableInstruction(m.feature)
+				return (
+					<label key={m.key} className={enabled ? 'ingest-file-method' : 'ingest-file-method disabled'}>
+						<input
+							type="radio"
+							name="ingest-method"
+							value={m.key}
+							checked={method === m.key}
+							onChange={() => onChange(m.key)}
+							disabled={!enabled}
+						/>
+						<span>
+							<strong>{m.label}</strong>
+							<span className="ingest-file-method-hint">{m.hint}</span>
+							{!enabled && (
+								<span className="ingest-file-method-disabled-hint">
+									Not deployed — add <code>{value}</code> to <code>{property}</code>
+								</span>
+							)}
+						</span>
+					</label>
+				)
+			})}
 		</div>
 	)
 }
@@ -553,7 +592,7 @@ function ReviewStep({
 			</div>
 			<div className="ingest-file-review-row">
 				<span className="modal-field-label">Method</span>
-				<span className="ingest-file-review-value">{METHOD_LABELS[method]}</span>
+				<span className="ingest-file-review-value">{ingestMethodLabel(method)}</span>
 			</div>
 		</div>
 	)
