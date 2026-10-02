@@ -243,6 +243,22 @@ public class SleeperPropertyValueUtils {
     }
 
     /**
+     * Checks if a property value is a valid list of OIDC issuers for the Sleeper REST API. An unset value is valid,
+     * and means no OIDC issuers are configured.
+     *
+     * @param  string the issuers as a JSON array
+     * @return        true if the string represents a valid list of issuers
+     */
+    public static boolean isValidOidcIssuers(String string) {
+        try {
+            OidcIssuerConfigSerDe.readList(string);
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
      * Checks if a property value is a valid number of bytes to configure the Hadoop AWS integration.
      *
      * @param  numberOfBytes the value
