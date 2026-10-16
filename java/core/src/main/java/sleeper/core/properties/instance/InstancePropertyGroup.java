@@ -92,9 +92,9 @@ public class InstancePropertyGroup {
             .description("The following instance properties relate to the Sleeper REST API, " +
                     "including how clients authenticate and which clients are authorised.")
             .details("The API rejects all access unless at least one authentication source is configured. " +
-                    "An authentication source is either an OIDC issuer listed in sleeper.api.auth.oidc.issuers, " +
-                    "a Cognito user pool created by setting sleeper.api.auth.cognito.enabled, or IAM " +
-                    "authentication for AWS compute, which is enabled by default.\n" +
+                    "An authentication source is either an OIDC issuer listed in sleeper.rest.api.auth.oidc.issuers, " +
+                    "a Cognito user pool created by setting sleeper.rest.api.auth.cognito.enabled, or IAM " +
+                    "authentication, which is enabled by default.\n" +
                     "\n" +
                     "Authentication establishes who a client is. It never grants them any permissions. " +
                     "Permissions come only from the principal allow-list, so a claim in a token cannot grant " +

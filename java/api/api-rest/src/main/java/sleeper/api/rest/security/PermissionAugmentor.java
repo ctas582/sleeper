@@ -1,0 +1,77 @@
+/*
+ * Copyright 2022-2026 Crown Copyright
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package sleeper.api.rest.security;
+
+import io.quarkus.security.identity.AuthenticationRequestContext;
+import io.quarkus.security.identity.SecurityIdentity;
+import io.quarkus.security.identity.SecurityIdentityAugmentor;
+import io.quarkus.security.runtime.QuarkusSecurityIdentity;
+import io.smallrye.mutiny.Uni;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+import sleeper.api.auth.PrincipalId;
+import sleeper.api.auth.PrincipalPermissions;
+import sleeper.api.auth.SleeperPermission;
+import sleeper.api.auth.store.AdminPrincipalsStore;
+import sleeper.api.rest.config.InstancePropertiesProvider;
+
+import java.util.Arrays;
+import java.util.stream.Stream;
+
+/**
+ * Decides what a client is allowed to do, once it is known who they are.
+ * Permissions are looked up against the principal, never taken from the token the client presented.
+ */
+@ApplicationScoped
+public class PermissionAugmentor implements SecurityIdentityAugmentor {
+
+    private final InstancePropertiesProvider instanceProperties;
+
+    @Inject
+    public PermissionAugmentor(InstancePropertiesProvider instanceProperties) {
+        this.instanceProperties = instanceProperties;
+    }
+
+    @Override
+    public Uni<SecurityIdentity> augment(SecurityIdentity identity, AuthenticationRequestContext context) {
+        return SleeperIdentity.principalOf(identity)
+                .map(principal -> context.runBlocking(() -> withPermissions(identity, principal)))
+                .orElseGet(() -> Uni.createFrom().item(identity));
+    }
+
+    /**
+     * Looks up what the client is allowed to do.
+     *
+     * @param  identity  the identity for the request
+     * @param  principal who the client is
+     * @return           the identity, carrying what they are allowed to do
+     */
+    private SecurityIdentity withPermissions(SecurityIdentity identity, PrincipalId principal) {
+        PrincipalPermissions permissions = AdminPrincipalsStore.from(instanceProperties.get()).permissionsFor(principal);
+        QuarkusSecurityIdentity.Builder builder = QuarkusSecurityIdentity.builder(identity)
+                .addAttribute(SleeperIdentity.PERMISSIONS, permissions);
+        instanceWidePermissions()
+                .filter(permissions::allows)
+                .forEach(permission -> builder.addRole(permission.name()));
+        return builder.build();
+    }
+
+    private static Stream<SleeperPermission> instanceWidePermissions() {
+        return Arrays.stream(SleeperPermission.values()).filter(permission -> !permission.isTableScoped());
+    }
+
+}

@@ -76,6 +76,15 @@ public class TableScope {
         return tableIds.isEmpty();
     }
 
+    /**
+     * Retrieves the tables this covers. Empty when it covers every table, which {@link #isAllTables} reports.
+     *
+     * @return the IDs of the tables
+     */
+    public Set<String> tableIds() {
+        return tableIds;
+    }
+
     @Override
     public boolean equals(Object object) {
         if (this == object) {

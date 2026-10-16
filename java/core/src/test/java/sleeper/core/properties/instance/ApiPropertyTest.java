@@ -53,7 +53,7 @@ public class ApiPropertyTest {
 
         assertThatThrownBy(properties::validate)
                 .isInstanceOf(SleeperPropertiesInvalidException.class)
-                .hasMessageContaining("sleeper.api.auth.oidc.issuers");
+                .hasMessageContaining("sleeper.rest.api.auth.oidc.issuers");
     }
 
     @Test
