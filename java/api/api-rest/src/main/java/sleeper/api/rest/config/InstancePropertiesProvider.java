@@ -50,7 +50,14 @@ public class InstancePropertiesProvider {
      * @return the configuration
      */
     public InstanceProperties get() {
-        return S3InstanceProperties.loadFromBucket(s3Client, configBucket);
+        try {
+            return S3InstanceProperties.loadFromBucket(s3Client, configBucket);
+        } catch (RuntimeException e) {
+            throw new InstanceConfigurationException(
+                    "The configuration of this Sleeper instance could not be read from " + configBucket + ".",
+                    "Check the bucket exists, holds this instance's configuration, and that the API is allowed to read it.",
+                    e);
+        }
     }
 
     /**
