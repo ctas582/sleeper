@@ -23,6 +23,10 @@ import org.jboss.logging.Logger;
 import sleeper.api.rest.ApiError;
 import sleeper.api.rest.config.InstanceConfigurationException;
 
+/**
+ * Send a useful error message to the client when an instance's configuration cannot be read, rather than
+ * exposing a potentially confusing AWS SDK error.
+ */
 @Provider
 public class InstanceConfigurationExceptionMapper implements ExceptionMapper<InstanceConfigurationException> {
 
