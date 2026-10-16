@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -85,8 +84,7 @@ public class OidcIssuerConfigSerDeTest {
             assertThat(OidcIssuerConfigSerDe.readList(json("""
                     {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api", "sleeper-ui"],
                      "jwksUri": "%s", "tokenEndpoint": "https://idp.internal/token",
-                     "principalClaim": "preferred_username", "allowedAlgorithms": ["ES256"],
-                     "clockSkewSeconds": 120}
+                     "principalClaim": "preferred_username", "clockSkewSeconds": 120}
                     """.formatted(ISSUER, JWKS_URI))))
                     .containsExactly(OidcIssuerConfig.builder()
                             .name("corp").issuer(ISSUER)
@@ -94,7 +92,6 @@ public class OidcIssuerConfigSerDeTest {
                             .jwksUri(JWKS_URI)
                             .tokenEndpoint("https://idp.internal/token")
                             .principalClaim("preferred_username")
-                            .allowedAlgorithms(Set.of("ES256"))
                             .clockSkewSeconds(120)
                             .build());
         }
@@ -122,12 +119,6 @@ public class OidcIssuerConfigSerDeTest {
                     .isEqualTo("sub");
         }
 
-        @Test
-        void shouldAllowOnlyAsymmetricSignatureAlgorithmsByDefault() {
-            assertThat(readOne(issuerJson("corp", ISSUER)).allowedAlgorithms())
-                    .isEqualTo(OidcIssuerConfig.DEFAULT_ALLOWED_ALGORITHMS)
-                    .noneMatch(algorithm -> algorithm.startsWith("HS"));
-        }
 
         @Test
         void shouldApplyDefaultClockSkew() {
@@ -142,49 +133,6 @@ public class OidcIssuerConfigSerDeTest {
         }
     }
 
-    @Nested
-    @DisplayName("Reject unsafe signature algorithms")
-    class RejectUnsafeSignatureAlgorithms {
-
-        @Test
-        void shouldRefuseSymmetricAlgorithm() {
-            assertThatThrownBy(() -> readOne("""
-                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
-                     "allowedAlgorithms": ["HS256"]}
-                    """.formatted(ISSUER, JWKS_URI)))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("HS256");
-        }
-
-        @Test
-        void shouldRefuseUnsignedTokens() {
-            assertThatThrownBy(() -> readOne("""
-                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
-                     "allowedAlgorithms": ["none"]}
-                    """.formatted(ISSUER, JWKS_URI)))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("none");
-        }
-
-        @Test
-        void shouldRefuseSymmetricAlgorithmEvenAlongsideAsymmetricOnes() {
-            assertThatThrownBy(() -> readOne("""
-                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
-                     "allowedAlgorithms": ["RS256", "HS512"]}
-                    """.formatted(ISSUER, JWKS_URI)))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("HS512");
-        }
-
-        @Test
-        void shouldRefuseEmptyListOfAlgorithms() {
-            assertThatThrownBy(() -> readOne("""
-                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
-                     "allowedAlgorithms": []}
-                    """.formatted(ISSUER, JWKS_URI)))
-                    .isInstanceOf(IllegalArgumentException.class);
-        }
-    }
 
     @Nested
     @DisplayName("Reject configuration that would accept the wrong tokens")
@@ -365,8 +313,7 @@ public class OidcIssuerConfigSerDeTest {
                             .build(),
                     OidcIssuerConfig.builder()
                             .name("isolated").issuer("https://other.internal").audiences(List.of("sleeper-api"))
-                            .publicKey("a-public-key").principalClaim("email")
-                            .allowedAlgorithms(Set.of("ES384")).clockSkewSeconds(5)
+                            .publicKey("a-public-key").principalClaim("email").clockSkewSeconds(5)
                             .build());
 
             assertThat(OidcIssuerConfigSerDe.readList(OidcIssuerConfigSerDe.toJson(issuers)))

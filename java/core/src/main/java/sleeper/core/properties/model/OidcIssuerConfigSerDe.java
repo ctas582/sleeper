@@ -106,10 +106,6 @@ public class OidcIssuerConfigSerDe {
         if (principalClaim != null) {
             builder.principalClaim(principalClaim);
         }
-        List<String> allowedAlgorithms = readStringList(object, "allowedAlgorithms");
-        if (allowedAlgorithms != null) {
-            builder.allowedAlgorithms(new LinkedHashSet<>(allowedAlgorithms));
-        }
         Integer clockSkewSeconds = readInt(object, "clockSkewSeconds");
         if (clockSkewSeconds != null) {
             builder.clockSkewSeconds(clockSkewSeconds);
@@ -128,9 +124,6 @@ public class OidcIssuerConfigSerDe {
         addIfSet(object, "publicKey", issuer.publicKey());
         addIfSet(object, "tokenEndpoint", issuer.tokenEndpoint());
         object.addProperty("principalClaim", issuer.principalClaim());
-        JsonArray allowedAlgorithms = new JsonArray();
-        issuer.allowedAlgorithms().stream().sorted().forEach(allowedAlgorithms::add);
-        object.add("allowedAlgorithms", allowedAlgorithms);
         object.addProperty("clockSkewSeconds", issuer.clockSkewSeconds());
         return object;
     }

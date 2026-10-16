@@ -17,10 +17,8 @@ package sleeper.core.properties.model;
 
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
 /**
  * Configuration for a single OIDC issuer whose JSON Web Tokens the Sleeper REST API will accept.
@@ -42,7 +40,6 @@ import java.util.Set;
  *                          API so that scripts do not need to hard code it, or null if not known
  * @param principalClaim    the claim holding the identifier of the client, used to look them up in the principal
  *                          allow-list
- * @param allowedAlgorithms the signature algorithms accepted for tokens from this issuer
  * @param clockSkewSeconds  how much clock difference to tolerate when checking token expiry
  */
 public record OidcIssuerConfig(
@@ -53,22 +50,11 @@ public record OidcIssuerConfig(
         String publicKey,
         String tokenEndpoint,
         String principalClaim,
-        Set<String> allowedAlgorithms,
         int clockSkewSeconds) {
 
     public static final String DEFAULT_PRINCIPAL_CLAIM = "sub";
     public static final int DEFAULT_CLOCK_SKEW_SECONDS = 60;
     public static final int MAX_CLOCK_SKEW_SECONDS = 300;
-
-    /**
-     * The signature algorithms accepted when an issuer does not specify any. Only asymmetric algorithms are included.
-     * Symmetric algorithms are never accepted, because a verifier that accepts them can be tricked into treating an
-     * issuer's public key as an HMAC secret, letting an attacker forge tokens. See {@link #validateAlgorithm}.
-     */
-    public static final Set<String> DEFAULT_ALLOWED_ALGORITHMS = Set.of(
-            "RS256", "RS384", "RS512",
-            "ES256", "ES384", "ES512",
-            "PS256", "PS384", "PS512");
 
     public OidcIssuerConfig {
         requireNonBlank(name, "name");
@@ -99,17 +85,11 @@ public record OidcIssuerConfig(
             requireAbsoluteUri(tokenEndpoint, "tokenEndpoint");
         }
         requireNonBlank(principalClaim, "principalClaim");
-        if (allowedAlgorithms == null || allowedAlgorithms.isEmpty()) {
-            throw new IllegalArgumentException("OIDC issuer \"" + name + "\" must allow at least one signature " +
-                    "algorithm.");
-        }
-        allowedAlgorithms.forEach(algorithm -> validateAlgorithm(name, algorithm));
         if (clockSkewSeconds < 0 || clockSkewSeconds > MAX_CLOCK_SKEW_SECONDS) {
             throw new IllegalArgumentException("OIDC issuer \"" + name + "\" must set clockSkewSeconds between 0 and " +
                     MAX_CLOCK_SKEW_SECONDS + ", found: " + clockSkewSeconds);
         }
         audiences = List.copyOf(audiences);
-        allowedAlgorithms = Set.copyOf(allowedAlgorithms);
     }
 
     public static Builder builder() {
@@ -124,16 +104,6 @@ public record OidcIssuerConfig(
      */
     public boolean isSelfContained() {
         return publicKey != null;
-    }
-
-    private static void validateAlgorithm(String issuerName, String algorithm) {
-        requireNonBlank(algorithm, "algorithm");
-        if (!DEFAULT_ALLOWED_ALGORITHMS.contains(algorithm)) {
-            throw new IllegalArgumentException("OIDC issuer \"" + issuerName + "\" set an unsupported signature " +
-                    "algorithm: " + algorithm + ". Supported algorithms are " + DEFAULT_ALLOWED_ALGORITHMS.stream()
-                            .sorted().toList() +
-                    ". Symmetric algorithms and \"none\" are never accepted.");
-        }
     }
 
     private static void requireNonBlank(String value, String field) {
@@ -163,7 +133,6 @@ public record OidcIssuerConfig(
         private String publicKey;
         private String tokenEndpoint;
         private String principalClaim = DEFAULT_PRINCIPAL_CLAIM;
-        private Set<String> allowedAlgorithms = new LinkedHashSet<>(DEFAULT_ALLOWED_ALGORITHMS);
         private int clockSkewSeconds = DEFAULT_CLOCK_SKEW_SECONDS;
 
         private Builder() {
@@ -214,10 +183,11 @@ public record OidcIssuerConfig(
         }
 
         /**
-         * Sets this issuer's signing key directly, so no network call to the issuer is needed. Mutually exclusive with
-         * the JWKS URI.
+         * Sets this issuer's signing keys directly, so no network call to the issuer is needed. Holds either a
+         * single key or a whole JSON Web Key Set, so an issuer the API cannot reach can still rotate its keys.
+         * Mutually exclusive with the JWKS URI.
          *
-         * @param  publicKey the public key, PEM encoded or as a JSON Web Key
+         * @param  publicKey the key, or a JSON Web Key Set
          * @return           this builder
          */
         public Builder publicKey(String publicKey) {
@@ -249,17 +219,6 @@ public record OidcIssuerConfig(
         }
 
         /**
-         * Sets the signature algorithms accepted for tokens from this issuer.
-         *
-         * @param  allowedAlgorithms the algorithms
-         * @return                   this builder
-         */
-        public Builder allowedAlgorithms(Set<String> allowedAlgorithms) {
-            this.allowedAlgorithms = allowedAlgorithms;
-            return this;
-        }
-
-        /**
          * Sets how much clock difference to tolerate when checking token expiry.
          *
          * @param  clockSkewSeconds the tolerance in seconds
@@ -272,7 +231,7 @@ public record OidcIssuerConfig(
 
         public OidcIssuerConfig build() {
             return new OidcIssuerConfig(name, issuer, audiences, jwksUri, publicKey, tokenEndpoint,
-                    principalClaim, allowedAlgorithms, clockSkewSeconds);
+                    principalClaim, clockSkewSeconds);
         }
     }
 

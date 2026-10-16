@@ -35,9 +35,8 @@ public interface ApiProperty {
                     "them from, or publicKey to hold the key directly. Use publicKey where the API has no network " +
                     "access to the issuer.\n" +
                     "\n" +
-                    "Optionally set principalClaim (defaults to sub), allowedAlgorithms, clockSkewSeconds, and " +
-                    "tokenEndpoint. The token endpoint is reported by the API so that automation does not need to " +
-                    "hard code it. Only asymmetric signature algorithms are supported.\n" +
+                    "Optionally set principalClaim (defaults to sub), clockSkewSeconds, and tokenEndpoint. The " +
+                    "token endpoint is reported by the API so that automation does not need to hard code it.\n" +
                     "\n" +
                     "For example:\n" +
                     "[{\"name\":\"corp\",\"issuer\":\"https://idp.internal/realms/sleeper\"," +
