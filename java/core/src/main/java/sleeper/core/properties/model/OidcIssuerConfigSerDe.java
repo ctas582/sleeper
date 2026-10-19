@@ -100,7 +100,7 @@ public class OidcIssuerConfigSerDe {
                 .issuer(readString(object, "issuer"))
                 .audiences(readStringList(object, "audiences"))
                 .jwksUri(readString(object, "jwksUri"))
-                .publicKey(readString(object, "publicKey"))
+                .publicKey(readKey(object, "publicKey"))
                 .tokenEndpoint(readString(object, "tokenEndpoint"));
         String principalClaim = readString(object, "principalClaim");
         if (principalClaim != null) {
@@ -121,11 +121,73 @@ public class OidcIssuerConfigSerDe {
         issuer.audiences().forEach(audiences::add);
         object.add("audiences", audiences);
         addIfSet(object, "jwksUri", issuer.jwksUri());
-        addIfSet(object, "publicKey", issuer.publicKey());
+        addKeyIfSet(object, issuer.publicKey());
         addIfSet(object, "tokenEndpoint", issuer.tokenEndpoint());
         object.addProperty("principalClaim", issuer.principalClaim());
         object.addProperty("clockSkewSeconds", issuer.clockSkewSeconds());
         return object;
+    }
+
+    /**
+     * Reads an issuer's signing keys, which may be written as a JSON Web Key Set rather than as text.
+     *
+     * @param  object the issuer
+     * @param  field  the field holding the keys
+     * @return        the keys, or null if the issuer does not hold its own
+     */
+    private static String readKey(JsonObject object, String field) {
+        JsonElement element = object.get(field);
+        if (element == null || element.isJsonNull()) {
+            return null;
+        }
+        if (element.isJsonObject()) {
+            checkKeysCanBeVerifiedLocally(element.getAsJsonObject());
+            return element.toString();
+        }
+        return readString(object, field);
+    }
+
+    /**
+     * Checks that keys held in the configuration are ones the API can verify a token against. Keys held here are read
+     * as RSA, so an issuer signing with anything else has to be reachable for its keys to be fetched instead.
+     *
+     * @param  keySet                   the issuer's keys, as a JSON Web Key Set
+     * @throws IllegalArgumentException if the API could not verify a token against the keys
+     */
+    private static void checkKeysCanBeVerifiedLocally(JsonObject keySet) {
+        JsonElement keys = keySet.get("keys");
+        if (keys == null || !keys.isJsonArray()) {
+            throw new IllegalArgumentException("OIDC issuer publicKey must be a JSON Web Key Set, holding keys.");
+        }
+        for (JsonElement key : keys.getAsJsonArray()) {
+            JsonElement keyType = key.isJsonObject() ? key.getAsJsonObject().get("kty") : null;
+            if (keyType == null || !keyType.isJsonPrimitive() || !"RSA".equals(keyType.getAsString())) {
+                throw new IllegalArgumentException("OIDC issuer publicKey must hold RSA keys, as a key held in the " +
+                        "configuration is read as RSA. Set jwksUri instead, to fetch the issuer's keys from it.");
+            }
+        }
+    }
+
+    /**
+     * Writes an issuer's signing keys back in the form they were given in.
+     *
+     * @param object    the issuer
+     * @param publicKey the keys, or null if the issuer does not hold its own
+     */
+    private static void addKeyIfSet(JsonObject object, String publicKey) {
+        if (publicKey == null) {
+            return;
+        }
+        try {
+            JsonElement parsed = JsonParser.parseString(publicKey);
+            if (parsed.isJsonObject()) {
+                object.add("publicKey", parsed);
+                return;
+            }
+        } catch (JsonSyntaxException e) {
+            // Not a key set, so it is text such as a PEM encoded key.
+        }
+        object.addProperty("publicKey", publicKey);
     }
 
     private static void addIfSet(JsonObject object, String field, String value) {

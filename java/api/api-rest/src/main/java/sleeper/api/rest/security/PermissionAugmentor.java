@@ -22,6 +22,7 @@ import io.quarkus.security.runtime.QuarkusSecurityIdentity;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 
 import sleeper.api.auth.PrincipalId;
 import sleeper.api.auth.PrincipalPermissions;
@@ -30,6 +31,7 @@ import sleeper.api.auth.store.AdminPrincipalsStore;
 import sleeper.api.rest.config.InstancePropertiesProvider;
 
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -48,13 +50,40 @@ public class PermissionAugmentor implements SecurityIdentityAugmentor {
 
     @Override
     public Uni<SecurityIdentity> augment(SecurityIdentity identity, AuthenticationRequestContext context) {
-        return SleeperIdentity.principalOf(identity)
+        return principalOf(identity)
                 .map(principal -> context.runBlocking(() -> withPermissions(identity, principal)))
                 .orElseGet(() -> Uni.createFrom().item(identity));
     }
 
     /**
-     * Looks up what the client is allowed to do.
+     * Works out who the client is.
+     *
+     * @param  identity the identity for the request
+     * @return          who the client is, or an empty optional if they did not authenticate
+     */
+    private static Optional<PrincipalId> principalOf(SecurityIdentity identity) {
+        return SleeperIdentity.principalOf(identity)
+                .or(() -> tokenPrincipalOf(identity));
+    }
+
+    /**
+     * Identifies a client from the token they presented.
+     *
+     * @param  identity the identity for the request
+     * @return          who the client is, or an empty optional if they did not present a token
+     */
+    private static Optional<PrincipalId> tokenPrincipalOf(SecurityIdentity identity) {
+        if (identity == null || !(identity.getPrincipal() instanceof JsonWebToken token)) {
+            return Optional.empty();
+        }
+        if (token.getIssuer() == null || token.getName() == null) {
+            return Optional.empty();
+        }
+        return Optional.of(PrincipalId.forToken(token.getIssuer(), token.getName()));
+    }
+
+    /**
+     * Looks up what the client is allowed to do, and builds an identity carrying only that access.
      *
      * @param  identity  the identity for the request
      * @param  principal who the client is
@@ -62,7 +91,11 @@ public class PermissionAugmentor implements SecurityIdentityAugmentor {
      */
     private SecurityIdentity withPermissions(SecurityIdentity identity, PrincipalId principal) {
         PrincipalPermissions permissions = AdminPrincipalsStore.from(instanceProperties.get()).permissionsFor(principal);
-        QuarkusSecurityIdentity.Builder builder = QuarkusSecurityIdentity.builder(identity)
+        QuarkusSecurityIdentity.Builder builder = QuarkusSecurityIdentity.builder()
+                .setPrincipal(identity.getPrincipal())
+                .addAttributes(identity.getAttributes())
+                .addCredentials(identity.getCredentials())
+                .addAttribute(SleeperIdentity.PRINCIPAL, principal)
                 .addAttribute(SleeperIdentity.PERMISSIONS, permissions);
         instanceWidePermissions()
                 .filter(permissions::allows)

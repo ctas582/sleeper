@@ -71,6 +71,52 @@ public class OidcIssuerConfigSerDeTest {
         }
 
         @Test
+        void shouldReadKeySetHeldAsJsonRatherThanAsAString() {
+            assertThat(OidcIssuerConfigSerDe.readList(json("""
+                    {"name": "isolated", "issuer": "%s", "audiences": ["sleeper-api"],
+                     "publicKey": {"keys": [{"kty": "RSA", "kid": "one", "n": "abc", "e": "AQAB"}]}}
+                    """.formatted(ISSUER))))
+                    .extracting(OidcIssuerConfig::publicKey)
+                    .containsExactly("{\"keys\":[{\"kty\":\"RSA\",\"kid\":\"one\",\"n\":\"abc\",\"e\":\"AQAB\"}]}");
+        }
+
+        @Test
+        void shouldRefuseAKeySetTheApiCouldNotVerifyATokenAgainst() {
+            // A key held in the configuration is read as RSA, so an issuer signing with an elliptic curve key has to
+            // be reachable instead.
+            assertThatThrownBy(() -> OidcIssuerConfigSerDe.readList(json("""
+                    {"name": "isolated", "issuer": "%s", "audiences": ["sleeper-api"],
+                     "publicKey": {"keys": [{"kty": "EC", "kid": "one", "crv": "P-256"}]}}
+                    """.formatted(ISSUER))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("RSA")
+                    .hasMessageContaining("jwksUri");
+        }
+
+        @Test
+        void shouldRefuseAKeySetThatHoldsNoKeys() {
+            assertThatThrownBy(() -> OidcIssuerConfigSerDe.readList(json("""
+                    {"name": "isolated", "issuer": "%s", "audiences": ["sleeper-api"],
+                     "publicKey": {"notKeys": []}}
+                    """.formatted(ISSUER))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("JSON Web Key Set");
+        }
+
+        @Test
+        void shouldWriteKeySetBackAsJsonSoThatItIsNotTurnedIntoAString() {
+            String json = json("""
+                    {"name": "isolated", "issuer": "%s", "audiences": ["sleeper-api"],
+                     "publicKey": {"keys": [{"kty": "RSA", "kid": "one", "n": "abc", "e": "AQAB"}]}}
+                    """.formatted(ISSUER));
+
+            assertThat(OidcIssuerConfigSerDe.toJson(OidcIssuerConfigSerDe.readList(json)))
+                    .contains("\"publicKey\":{\"keys\":[")
+                    .satisfies(written -> assertThat(OidcIssuerConfigSerDe.readList(written))
+                            .isEqualTo(OidcIssuerConfigSerDe.readList(json)));
+        }
+
+        @Test
         void shouldReadMultipleIssuersInTheOrderTheyWereDeclared() {
             assertThat(OidcIssuerConfigSerDe.readList(json(
                     issuerJson("first", "https://first.internal"),
