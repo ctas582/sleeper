@@ -238,5 +238,18 @@
             <version>${project.parent.version}</version>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>sleeper</groupId>
+            <artifactId>api-rest</artifactId>
+            <version>${project.parent.version}</version>
+            <scope>runtime</scope>
+            <!-- Dependencies excluded because Quarkus BOM causes dependencyConvergence rule to report version disagreements. -->
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
 </project>

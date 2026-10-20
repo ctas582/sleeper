@@ -125,7 +125,10 @@ public class SyncJars {
 
     private static List<Path> listJarsInDirectory(Path directory) throws IOException {
         try (Stream<Path> jars = Files.list(directory)) {
-            return jars.filter(path -> path.toFile().getName().endsWith(".jar")).collect(Collectors.toList());
+            return jars.filter(path -> {
+                String name = path.toFile().getName();
+                return name.endsWith(".jar") || name.endsWith(".zip");
+            }).collect(Collectors.toList());
         }
     }
 }

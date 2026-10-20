@@ -67,6 +67,7 @@ Docker image for each lambda jar.
 | metrics-`<version-number>`.jar                       | metrics-lambda                    | false                |
 | statestore-lambda-`<version-number>`.jar             | statestore-lambda                 | false                |
 | rest-api-`<version-number>`.jar                      | rest-api-lambda                   | false                |
+| api-`<version-number>`.zip                           | api-lambda                        | false                |
 
 
 ## Building and pushing

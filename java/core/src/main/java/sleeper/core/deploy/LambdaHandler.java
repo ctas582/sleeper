@@ -203,6 +203,10 @@ public class LambdaHandler {
             .jar(LambdaJar.REST_API)
             .handler("sleeper.restapi.RestApiLambda::handleEvent")
             .core().add();
+    public static final LambdaHandler API_HANDLER = builder()
+            .jar(LambdaJar.API)
+            .handler("io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest")
+            .optionalStack(OptionalStack.ApiStack).add();
 
     private final LambdaJar jar;
     private final String handler;

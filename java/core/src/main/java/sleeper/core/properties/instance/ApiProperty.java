@@ -32,7 +32,7 @@ public interface ApiProperty {
                     "least one audience.\n" +
                     "\n" +
                     "Each issuer must also supply its signing keys, by setting either jwksUri for the API to fetch " +
-                    "them from, or publicKey to hold the key directly. Use publicKey where the API has no network " +
+                    "them from, or publicKey to hold them directly. Use publicKey where the API has no network " +
                     "access to the issuer.\n" +
                     "\n" +
                     "Optionally set principalClaim (defaults to sub), clockSkewSeconds, and tokenEndpoint. The " +

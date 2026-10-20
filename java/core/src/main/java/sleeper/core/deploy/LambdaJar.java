@@ -106,6 +106,9 @@ public class LambdaJar {
     public static final LambdaJar REST_API = builder().filenameFormat("rest-api-%s.jar")
             .imageName("rest-api-lambda")
             .artifactId("rest-api").add();
+    public static final LambdaJar API = builder().filenameFormat("api-%s.zip")
+            .imageName("api-lambda")
+            .artifactId("api-rest").add();
 
     private final String filenameFormat;
     private final String imageName;

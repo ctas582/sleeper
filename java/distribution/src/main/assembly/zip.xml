@@ -255,6 +255,13 @@
         </file>
         <file>
             <source>
+                ${project.basedir}/../api/api-rest/target/function.zip
+            </source>
+            <outputDirectory>scripts/jars</outputDirectory>
+            <destName>api-${project.version}.zip</destName>
+        </file>
+        <file>
+            <source>
                 ${project.basedir}/../deployment/cdk-artefact-custom-resources/target/cdk-artefact-custom-resources-${project.version}-utility.jar
             </source>
             <outputDirectory>scripts/jars</outputDirectory>

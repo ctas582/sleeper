@@ -48,7 +48,7 @@ sleeper.retain.logs.after.destroy=true
 # Valid values: [IngestStack, IngestBatcherStack, EmrServerlessBulkImportStack, EmrBulkImportStack,
 # PersistentEmrBulkImportStack, EksBulkImportStack, EmrStudioStack, BulkExportStack, QueryStack,
 # WebSocketQueryStack, AthenaStack, KeepLambdaWarmStack, CompactionStack, GarbageCollectorStack,
-# PartitionSplittingStack, RestApiStack, DashboardStack, TableMetricsStack]
+# PartitionSplittingStack, RestApiStack, ApiStack, DashboardStack, TableMetricsStack]
 sleeper.optional.stacks=IngestStack,IngestBatcherStack,EmrServerlessBulkImportStack,EmrStudioStack,QueryStack,CompactionStack,GarbageCollectorStack,PartitionSplittingStack,DashboardStack,TableMetricsStack,WebSocketQueryStack,EmrBulkImportStack,AthenaStack,RestApiStack
 
 

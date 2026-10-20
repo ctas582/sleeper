@@ -122,7 +122,8 @@ public class LoggingStack extends NestedStack {
         QUERY_KEEP_WARM("query-keep-warm"),
         ITERATOR_APPLYING_ATHENA_HANDLER("IteratorApplying-athena-handler"),
         DATAFUSION_ATHENA_HANDLER("DataFusion-athena-handler"),
-        REST_API_HANDLER("rest-api-handler");
+        REST_API_HANDLER("rest-api-handler"),
+        API_HANDLER("api-handler");
 
         private final String shortName;
         private final String prefix;

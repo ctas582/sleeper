@@ -53,6 +53,7 @@ public enum OptionalStack {
 
     // Rest Api
     RestApiStack,
+    ApiStack,
 
     // Metrics
     DashboardStack,
