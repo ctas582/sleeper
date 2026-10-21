@@ -64,7 +64,9 @@ public class OidcTenantConfigFactory {
         if (signingKey != null) {
             builder.publicKey(signingKey);
         } else {
-            builder.jwksPath(issuer.jwksUri());
+            builder.discoveryEnabled(false)
+                    .authServerUrl(issuer.issuer())
+                    .jwksPath(issuer.jwksUri());
         }
 
         TokenConfigBuilder token = builder.token()

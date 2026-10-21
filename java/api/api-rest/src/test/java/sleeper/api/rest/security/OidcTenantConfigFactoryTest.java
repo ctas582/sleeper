@@ -53,6 +53,14 @@ class OidcTenantConfigFactoryTest {
     }
 
     @Test
+    void shouldNotAskAnIssuerWhereItsKeysAreWhenItHasAlreadyBeenConfigured() {
+        OidcTenantConfig config = OidcTenantConfigFactory.configFor(issuer().jwksUri(JWKS_URI).build(), null);
+
+        assertThat(config.discoveryEnabled()).contains(false);
+        assertThat(config.authServerUrl()).contains(ISSUER);
+    }
+
+    @Test
     void shouldOnlyAcceptTokensMeantForSleeper() {
         OidcTenantConfig config = OidcTenantConfigFactory.configFor(issuer()
                 .jwksUri(JWKS_URI)
