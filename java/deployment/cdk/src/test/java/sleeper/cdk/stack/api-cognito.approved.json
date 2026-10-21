@@ -165,6 +165,18 @@
             }
           }
         },
+        "UserPoolLogin": {
+          "Type": "AWS::Cognito::ManagedLoginBranding",
+          "Properties": {
+            "UserPoolId": {
+              "Ref": "UserPool6BA7E5F2"
+            },
+            "UseCognitoProvidedValues": true,
+            "ClientId": {
+              "Ref": "UserPoolUserPoolClient40176907"
+            }
+          }
+        },
         "IamApiDefaultStage03EFF517": {
           "Type": "AWS::ApiGatewayV2::Stage",
           "Properties": {
@@ -228,7 +240,8 @@
             "UserPoolId": {
               "Ref": "UserPool6BA7E5F2"
             },
-            "Domain": "sleeper-test-instance-api"
+            "Domain": "sleeper-test-instance-api",
+            "ManagedLoginVersion": 2
           }
         },
         "ApiHandlerLambdaCurrentVersion2DB552B4333e78865681c221444a0847846b23d3": {

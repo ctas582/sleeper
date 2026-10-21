@@ -27,7 +27,9 @@ import software.amazon.awscdk.services.apigatewayv2.HttpApi;
 import software.amazon.awscdk.services.apigatewayv2.HttpMethod;
 import software.amazon.awscdk.services.apigatewayv2.HttpRoute;
 import software.amazon.awscdk.services.cognito.AccountRecovery;
+import software.amazon.awscdk.services.cognito.CfnManagedLoginBranding;
 import software.amazon.awscdk.services.cognito.CognitoDomainOptions;
+import software.amazon.awscdk.services.cognito.ManagedLoginVersion;
 import software.amazon.awscdk.services.cognito.OAuthFlows;
 import software.amazon.awscdk.services.cognito.OAuthScope;
 import software.amazon.awscdk.services.cognito.OAuthSettings;
@@ -127,6 +129,7 @@ public class ApiStack extends NestedStack {
                 .cognitoDomain(CognitoDomainOptions.builder()
                         .domainPrefix(String.join("-", "sleeper", instanceId, "api"))
                         .build())
+                .managedLoginVersion(ManagedLoginVersion.NEWER_MANAGED_LOGIN)
                 .build());
 
         UserPoolClient client = userPool.addClient("UserPoolClient", UserPoolClientOptions.builder()
@@ -139,6 +142,12 @@ public class ApiStack extends NestedStack {
                         .logoutUrls(List.of(api.getApiEndpoint()))
                         .build())
                 .build());
+
+        CfnManagedLoginBranding.Builder.create(this, "UserPoolLogin")
+                .userPoolId(userPool.getUserPoolId())
+                .clientId(client.getUserPoolClientId())
+                .useCognitoProvidedValues(true)
+                .build();
 
         instanceProperties.set(REST_API_COGNITO_ISSUER, userPool.getUserPoolProviderUrl());
         instanceProperties.set(REST_API_COGNITO_CLIENT_ID, client.getUserPoolClientId());
