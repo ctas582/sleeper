@@ -26,20 +26,36 @@ import software.amazon.awscdk.services.apigatewayv2.AddRoutesOptions;
 import software.amazon.awscdk.services.apigatewayv2.HttpApi;
 import software.amazon.awscdk.services.apigatewayv2.HttpMethod;
 import software.amazon.awscdk.services.apigatewayv2.HttpRoute;
+import software.amazon.awscdk.services.cognito.AccountRecovery;
+import software.amazon.awscdk.services.cognito.CognitoDomainOptions;
+import software.amazon.awscdk.services.cognito.OAuthFlows;
+import software.amazon.awscdk.services.cognito.OAuthScope;
+import software.amazon.awscdk.services.cognito.OAuthSettings;
+import software.amazon.awscdk.services.cognito.SignInAliases;
+import software.amazon.awscdk.services.cognito.UserPool;
+import software.amazon.awscdk.services.cognito.UserPoolClient;
+import software.amazon.awscdk.services.cognito.UserPoolClientOptions;
+import software.amazon.awscdk.services.cognito.UserPoolDomain;
+import software.amazon.awscdk.services.cognito.UserPoolDomainOptions;
 import software.amazon.awscdk.services.lambda.IFunction;
 import software.constructs.Construct;
 
 import sleeper.cdk.SleeperInstanceProps;
 import sleeper.cdk.lambda.SleeperLambdaCode;
 import sleeper.cdk.stack.core.LoggingStack.LogGroupRef;
+import sleeper.cdk.util.Utils;
 import sleeper.core.deploy.LambdaHandler;
 import sleeper.core.properties.instance.InstanceProperties;
 import sleeper.core.util.EnvironmentUtils;
 
 import java.util.List;
 
+import static sleeper.core.properties.instance.ApiProperty.API_AUTH_COGNITO_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_IAM_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_LAMBDA_MEMORY_IN_MB;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_CLIENT_ID;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_ISSUER;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_LOGIN_URL;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_IAM_URL;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_URL;
 
@@ -92,6 +108,44 @@ public class ApiStack extends NestedStack {
                     .value(iamApi.getApiEndpoint())
                     .build());
         }
+
+        if (instanceProperties.getBoolean(API_AUTH_COGNITO_ENABLED)) {
+            createCognitoUserPool(instanceProperties, instanceId, tokenApi);
+        }
+    }
+
+    private void createCognitoUserPool(InstanceProperties instanceProperties, String instanceId, HttpApi api) {
+        UserPool userPool = UserPool.Builder.create(this, "UserPool")
+                .userPoolName(String.join("-", "sleeper", instanceId, "api"))
+                .selfSignUpEnabled(false)
+                .signInAliases(SignInAliases.builder().email(true).build())
+                .accountRecovery(AccountRecovery.EMAIL_ONLY)
+                .removalPolicy(Utils.removalPolicy(instanceProperties))
+                .build();
+
+        UserPoolDomain domain = userPool.addDomain("UserPoolDomain", UserPoolDomainOptions.builder()
+                .cognitoDomain(CognitoDomainOptions.builder()
+                        .domainPrefix(String.join("-", "sleeper", instanceId, "api"))
+                        .build())
+                .build());
+
+        UserPoolClient client = userPool.addClient("UserPoolClient", UserPoolClientOptions.builder()
+                .userPoolClientName(String.join("-", "sleeper", instanceId, "api"))
+                .generateSecret(false)
+                .oAuth(OAuthSettings.builder()
+                        .flows(OAuthFlows.builder().authorizationCodeGrant(true).build())
+                        .scopes(List.of(OAuthScope.OPENID, OAuthScope.PROFILE))
+                        .callbackUrls(List.of(api.getApiEndpoint()))
+                        .logoutUrls(List.of(api.getApiEndpoint()))
+                        .build())
+                .build());
+
+        instanceProperties.set(REST_API_COGNITO_ISSUER, userPool.getUserPoolProviderUrl());
+        instanceProperties.set(REST_API_COGNITO_CLIENT_ID, client.getUserPoolClientId());
+        instanceProperties.set(REST_API_COGNITO_LOGIN_URL, domain.baseUrl());
+        new CfnOutput(this, "ApiCognitoLoginUrl", CfnOutputProps.builder()
+                .value(domain.baseUrl())
+                .build());
     }
 
     private List<HttpRoute> addProxyRoutes(HttpApi api, IFunction lambda, String integrationName) {

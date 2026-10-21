@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -140,6 +141,59 @@ public class OidcIssuerConfigSerDeTest {
                             .principalClaim("preferred_username")
                             .clockSkewSeconds(120)
                             .build());
+        }
+
+        @Test
+        void shouldReadTheDetailsABrowserNeedsToSendSomeoneToSignIn() {
+            assertThat(OidcIssuerConfigSerDe.readList(json("""
+                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
+                     "authEndpoint": "https://idp.internal/authorize", "clientId": "sleeper-ui"}
+                    """.formatted(ISSUER, JWKS_URI))))
+                    .containsExactly(OidcIssuerConfig.builder()
+                            .name("corp").issuer(ISSUER).audiences(List.of("sleeper-api")).jwksUri(JWKS_URI)
+                            .authEndpoint("https://idp.internal/authorize")
+                            .clientId("sleeper-ui")
+                            .build());
+        }
+
+        @Test
+        void shouldReadClaimsATokenMustCarryBeyondTheUsualOnes() {
+            assertThat(OidcIssuerConfigSerDe.readList(json("""
+                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
+                     "requiredClaims": {"token_use": "id"}}
+                    """.formatted(ISSUER, JWKS_URI))))
+                    .extracting(OidcIssuerConfig::requiredClaims)
+                    .containsExactly(Map.of("token_use", "id"));
+        }
+
+        @Test
+        void shouldRequireNoFurtherClaimsWhenNoneAreGiven() {
+            assertThat(readOne(issuerJson("corp", ISSUER)).requiredClaims()).isEmpty();
+        }
+
+        @Test
+        void shouldRefuseARequiredClaimThatIsNotAString() {
+            assertThatThrownBy(() -> OidcIssuerConfigSerDe.readList(json("""
+                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
+                     "requiredClaims": {"token_use": ["id"]}}
+                    """.formatted(ISSUER, JWKS_URI))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("requiredClaims");
+        }
+
+        @Test
+        void shouldWriteBackEveryFieldItRead() {
+            String json = json("""
+                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
+                     "tokenEndpoint": "https://idp.internal/token",
+                     "authEndpoint": "https://idp.internal/authorize", "clientId": "sleeper-ui",
+                     "requiredClaims": {"token_use": "id"},
+                     "principalClaim": "preferred_username", "clockSkewSeconds": 120}
+                    """.formatted(ISSUER, JWKS_URI));
+
+            assertThat(OidcIssuerConfigSerDe.readList(OidcIssuerConfigSerDe.toJson(
+                    OidcIssuerConfigSerDe.readList(json))))
+                    .isEqualTo(OidcIssuerConfigSerDe.readList(json));
         }
 
         @Test

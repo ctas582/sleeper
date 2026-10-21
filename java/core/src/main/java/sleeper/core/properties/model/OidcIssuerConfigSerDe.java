@@ -22,8 +22,10 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -101,7 +103,10 @@ public class OidcIssuerConfigSerDe {
                 .audiences(readStringList(object, "audiences"))
                 .jwksUri(readString(object, "jwksUri"))
                 .publicKey(readKey(object, "publicKey"))
-                .tokenEndpoint(readString(object, "tokenEndpoint"));
+                .tokenEndpoint(readString(object, "tokenEndpoint"))
+                .authEndpoint(readString(object, "authEndpoint"))
+                .clientId(readString(object, "clientId"))
+                .requiredClaims(readStringMap(object, "requiredClaims"));
         String principalClaim = readString(object, "principalClaim");
         if (principalClaim != null) {
             builder.principalClaim(principalClaim);
@@ -123,6 +128,13 @@ public class OidcIssuerConfigSerDe {
         addIfSet(object, "jwksUri", issuer.jwksUri());
         addKeyIfSet(object, issuer.publicKey());
         addIfSet(object, "tokenEndpoint", issuer.tokenEndpoint());
+        addIfSet(object, "authEndpoint", issuer.authEndpoint());
+        addIfSet(object, "clientId", issuer.clientId());
+        if (!issuer.requiredClaims().isEmpty()) {
+            JsonObject requiredClaims = new JsonObject();
+            issuer.requiredClaims().forEach(requiredClaims::addProperty);
+            object.add("requiredClaims", requiredClaims);
+        }
         object.addProperty("principalClaim", issuer.principalClaim());
         object.addProperty("clockSkewSeconds", issuer.clockSkewSeconds());
         return object;
@@ -221,6 +233,25 @@ public class OidcIssuerConfigSerDe {
                 throw new IllegalArgumentException("OIDC issuer " + field + " must be an array of strings.");
             }
             values.add(entry.getAsString());
+        }
+        return values;
+    }
+
+    private static Map<String, String> readStringMap(JsonObject object, String field) {
+        JsonElement element = object.get(field);
+        if (element == null || element.isJsonNull()) {
+            return Map.of();
+        }
+        if (!element.isJsonObject()) {
+            throw new IllegalArgumentException("OIDC issuer " + field + " must be an object of strings.");
+        }
+        Map<String, String> values = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonElement> entry : element.getAsJsonObject().entrySet()) {
+            JsonElement value = entry.getValue();
+            if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
+                throw new IllegalArgumentException("OIDC issuer " + field + " must be an object of strings.");
+            }
+            values.put(entry.getKey(), value.getAsString());
         }
         return values;
     }

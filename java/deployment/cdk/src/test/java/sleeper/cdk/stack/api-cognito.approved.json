@@ -1,0 +1,413 @@
+{
+  "StackIdToTemplate": {
+    "Api": {
+      "Parameters": {
+        "referencetoTestInstanceConfigurationNestedStackConfigurationNestedStackResourceB866C9A7OutputsTestInstanceConfigurationConfigBucket257D90F2Ref": {
+          "Type": "String"
+        },
+        "referencetoTestInstanceConfigurationNestedStackConfigurationNestedStackResourceB866C9A7OutputsTestInstanceConfigurationConfigBucket257D90F2Arn": {
+          "Type": "String"
+        },
+        "referencetoTestInstanceLoggingNestedStackLoggingNestedStackResourceF6F78B9BOutputsTestInstanceLoggingapihandler95C539AERef": {
+          "Type": "String"
+        }
+      },
+      "Outputs": {
+        "ApiCognitoLoginUrl": {
+          "Value": {
+            "Fn::Join": [
+              "",
+              [
+                "https://",
+                {
+                  "Ref": "UserPoolUserPoolDomain9F01E991"
+                },
+                ".auth.test-region.amazoncognito.com"
+              ]
+            ]
+          }
+        },
+        "ApiUrl": {
+          "Value": {
+            "Fn::GetAtt": [
+              "ApiF70053CD",
+              "ApiEndpoint"
+            ]
+          }
+        },
+        "ApiIamUrl": {
+          "Value": {
+            "Fn::GetAtt": [
+              "IamApi23076CC5",
+              "ApiEndpoint"
+            ]
+          }
+        },
+        "TestInstanceApiIamApiD99345B4Ref": {
+          "Value": {
+            "Ref": "IamApi23076CC5"
+          }
+        }
+      },
+      "Resources": {
+        "IamApi23076CC5": {
+          "Type": "AWS::ApiGatewayV2::Api",
+          "Properties": {
+            "Description": "Sleeper API, for clients authenticating with AWS credentials",
+            "ProtocolType": "HTTP",
+            "Name": "sleeper-test-instance-api-handler-iam"
+          }
+        },
+        "UserPoolUserPoolClient40176907": {
+          "Type": "AWS::Cognito::UserPoolClient",
+          "Properties": {
+            "GenerateSecret": false,
+            "CallbackURLs": [
+              {
+                "Fn::GetAtt": [
+                  "ApiF70053CD",
+                  "ApiEndpoint"
+                ]
+              }
+            ],
+            "ClientName": "sleeper-test-instance-api",
+            "AllowedOAuthFlows": [
+              "code"
+            ],
+            "UserPoolId": {
+              "Ref": "UserPool6BA7E5F2"
+            },
+            "AllowedOAuthScopes": [
+              "openid",
+              "profile"
+            ],
+            "LogoutURLs": [
+              {
+                "Fn::GetAtt": [
+                  "ApiF70053CD",
+                  "ApiEndpoint"
+                ]
+              }
+            ],
+            "AllowedOAuthFlowsUserPoolClient": true,
+            "SupportedIdentityProviders": [
+              "COGNITO"
+            ]
+          }
+        },
+        "ApiHandlerLambdaB8B72F13": {
+          "Type": "AWS::Lambda::Function",
+          "DependsOn": [
+            "ApiHandlerLambdaServiceRoleDefaultPolicy7A5C7083",
+            "ApiHandlerLambdaServiceRoleE73F5EB1"
+          ],
+          "Properties": {
+            "Role": {
+              "Fn::GetAtt": [
+                "ApiHandlerLambdaServiceRoleE73F5EB1",
+                "Arn"
+              ]
+            },
+            "FunctionName": "sleeper-test-instance-api-handler",
+            "MemorySize": 1024,
+            "Runtime": "java17",
+            "Description": "Serves the Sleeper REST API",
+            "Timeout": 29,
+            "LoggingConfig": {
+              "LogGroup": {
+                "Ref": "referencetoTestInstanceLoggingNestedStackLoggingNestedStackResourceF6F78B9BOutputsTestInstanceLoggingapihandler95C539AERef"
+              }
+            },
+            "Environment": {
+              "Variables": {
+                "JAVA_TOOL_OPTIONS": "--add-opens\u003djava.base/java.nio\u003dALL-UNNAMED --add-opens\u003djava.base/sun.nio.ch\u003dALL-UNNAMED --add-opens\u003djava.base/java.util\u003dALL-UNNAMED --add-opens\u003djava.base/java.lang.invoke\u003dALL-UNNAMED",
+                "SLEEPER_CONFIG_BUCKET": {
+                  "Ref": "referencetoTestInstanceConfigurationNestedStackConfigurationNestedStackResourceB866C9A7OutputsTestInstanceConfigurationConfigBucket257D90F2Ref"
+                }
+              }
+            },
+            "Handler": "io.quarkus.amazon.lambda.runtime.QuarkusStreamHandler::handleRequest",
+            "Code": {
+              "S3ObjectVersion": "api-rest-test-version",
+              "S3Bucket": "sleeper-test-instance-jars-test-account",
+              "S3Key": "api-1.2.3.zip"
+            }
+          }
+        },
+        "ApiDefaultStage189A7074": {
+          "Type": "AWS::ApiGatewayV2::Stage",
+          "Properties": {
+            "AutoDeploy": true,
+            "StageName": "$default",
+            "ApiId": {
+              "Ref": "ApiF70053CD"
+            }
+          }
+        },
+        "ApiANYproxyA4087D62": {
+          "Type": "AWS::ApiGatewayV2::Route",
+          "Properties": {
+            "Target": {
+              "Fn::Join": [
+                "",
+                [
+                  "integrations/",
+                  {
+                    "Ref": "ApiANYproxytestinstance79F2FA6C"
+                  }
+                ]
+              ]
+            },
+            "RouteKey": "ANY /{proxy+}",
+            "AuthorizationType": "NONE",
+            "ApiId": {
+              "Ref": "ApiF70053CD"
+            }
+          }
+        },
+        "IamApiDefaultStage03EFF517": {
+          "Type": "AWS::ApiGatewayV2::Stage",
+          "Properties": {
+            "AutoDeploy": true,
+            "StageName": "$default",
+            "ApiId": {
+              "Ref": "IamApi23076CC5"
+            }
+          }
+        },
+        "IamApiANYproxytestinstanceiam1C79EC5C": {
+          "Type": "AWS::ApiGatewayV2::Integration",
+          "Properties": {
+            "IntegrationUri": {
+              "Ref": "ApiHandlerLambdaCurrentVersion2DB552B4333e78865681c221444a0847846b23d3"
+            },
+            "PayloadFormatVersion": "2.0",
+            "ApiId": {
+              "Ref": "IamApi23076CC5"
+            },
+            "IntegrationType": "AWS_PROXY"
+          }
+        },
+        "UserPool6BA7E5F2": {
+          "Type": "AWS::Cognito::UserPool",
+          "DeletionPolicy": "Retain",
+          "UpdateReplacePolicy": "Retain",
+          "Properties": {
+            "SmsVerificationMessage": "The verification code to your new account is {####}",
+            "VerificationMessageTemplate": {
+              "EmailMessage": "The verification code to your new account is {####}",
+              "SmsMessage": "The verification code to your new account is {####}",
+              "EmailSubject": "Verify your new account",
+              "DefaultEmailOption": "CONFIRM_WITH_CODE"
+            },
+            "AdminCreateUserConfig": {
+              "AllowAdminCreateUserOnly": true
+            },
+            "EmailVerificationSubject": "Verify your new account",
+            "AutoVerifiedAttributes": [
+              "email"
+            ],
+            "EmailVerificationMessage": "The verification code to your new account is {####}",
+            "UsernameAttributes": [
+              "email"
+            ],
+            "AccountRecoverySetting": {
+              "RecoveryMechanisms": [
+                {
+                  "Name": "verified_email",
+                  "Priority": 1
+                }
+              ]
+            },
+            "UserPoolName": "sleeper-test-instance-api"
+          }
+        },
+        "UserPoolUserPoolDomain9F01E991": {
+          "Type": "AWS::Cognito::UserPoolDomain",
+          "Properties": {
+            "UserPoolId": {
+              "Ref": "UserPool6BA7E5F2"
+            },
+            "Domain": "sleeper-test-instance-api"
+          }
+        },
+        "ApiHandlerLambdaCurrentVersion2DB552B4333e78865681c221444a0847846b23d3": {
+          "Type": "AWS::Lambda::Version",
+          "Metadata": {
+            "aws:cdk:do-not-refactor": true
+          },
+          "Properties": {
+            "FunctionName": {
+              "Ref": "ApiHandlerLambdaB8B72F13"
+            }
+          }
+        },
+        "IamApiANYproxyD71C88D4": {
+          "Type": "AWS::ApiGatewayV2::Route",
+          "Properties": {
+            "Target": {
+              "Fn::Join": [
+                "",
+                [
+                  "integrations/",
+                  {
+                    "Ref": "IamApiANYproxytestinstanceiam1C79EC5C"
+                  }
+                ]
+              ]
+            },
+            "RouteKey": "ANY /{proxy+}",
+            "AuthorizationType": "AWS_IAM",
+            "ApiId": {
+              "Ref": "IamApi23076CC5"
+            }
+          }
+        },
+        "ApiHandlerLambdaServiceRoleE73F5EB1": {
+          "Type": "AWS::IAM::Role",
+          "Properties": {
+            "ManagedPolicyArns": [
+              {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:",
+                    {
+                      "Ref": "AWS::Partition"
+                    },
+                    ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                  ]
+                ]
+              }
+            ],
+            "AssumeRolePolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": "sts:AssumeRole",
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Service": "lambda.amazonaws.com"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "ApiANYproxytestinstancePermissionC4A84451": {
+          "Type": "AWS::Lambda::Permission",
+          "Properties": {
+            "FunctionName": {
+              "Ref": "ApiHandlerLambdaCurrentVersion2DB552B4333e78865681c221444a0847846b23d3"
+            },
+            "Action": "lambda:InvokeFunction",
+            "SourceArn": {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:",
+                  {
+                    "Ref": "AWS::Partition"
+                  },
+                  ":execute-api:test-region:test-account:",
+                  {
+                    "Ref": "ApiF70053CD"
+                  },
+                  "/*/*/{proxy+}"
+                ]
+              ]
+            },
+            "Principal": "apigateway.amazonaws.com"
+          }
+        },
+        "IamApiANYproxytestinstanceiamPermission7504CEA1": {
+          "Type": "AWS::Lambda::Permission",
+          "Properties": {
+            "FunctionName": {
+              "Ref": "ApiHandlerLambdaCurrentVersion2DB552B4333e78865681c221444a0847846b23d3"
+            },
+            "Action": "lambda:InvokeFunction",
+            "SourceArn": {
+              "Fn::Join": [
+                "",
+                [
+                  "arn:",
+                  {
+                    "Ref": "AWS::Partition"
+                  },
+                  ":execute-api:test-region:test-account:",
+                  {
+                    "Ref": "IamApi23076CC5"
+                  },
+                  "/*/*/{proxy+}"
+                ]
+              ]
+            },
+            "Principal": "apigateway.amazonaws.com"
+          }
+        },
+        "ApiANYproxytestinstance79F2FA6C": {
+          "Type": "AWS::ApiGatewayV2::Integration",
+          "Properties": {
+            "IntegrationUri": {
+              "Ref": "ApiHandlerLambdaCurrentVersion2DB552B4333e78865681c221444a0847846b23d3"
+            },
+            "PayloadFormatVersion": "2.0",
+            "ApiId": {
+              "Ref": "ApiF70053CD"
+            },
+            "IntegrationType": "AWS_PROXY"
+          }
+        },
+        "ApiHandlerLambdaServiceRoleDefaultPolicy7A5C7083": {
+          "Type": "AWS::IAM::Policy",
+          "Properties": {
+            "PolicyName": "ApiHandlerLambdaServiceRoleDefaultPolicy7A5C7083",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Action": [
+                    "s3:GetObject*",
+                    "s3:GetBucket*",
+                    "s3:List*"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": [
+                    {
+                      "Ref": "referencetoTestInstanceConfigurationNestedStackConfigurationNestedStackResourceB866C9A7OutputsTestInstanceConfigurationConfigBucket257D90F2Arn"
+                    },
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          {
+                            "Ref": "referencetoTestInstanceConfigurationNestedStackConfigurationNestedStackResourceB866C9A7OutputsTestInstanceConfigurationConfigBucket257D90F2Arn"
+                          },
+                          "/*"
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "Roles": [
+              {
+                "Ref": "ApiHandlerLambdaServiceRoleE73F5EB1"
+              }
+            ]
+          }
+        },
+        "ApiF70053CD": {
+          "Type": "AWS::ApiGatewayV2::Api",
+          "Properties": {
+            "Description": "Sleeper API, for clients authenticating with a token",
+            "ProtocolType": "HTTP",
+            "Name": "sleeper-test-instance-api-handler"
+          }
+        }
+      }
+    }
+  }
+}

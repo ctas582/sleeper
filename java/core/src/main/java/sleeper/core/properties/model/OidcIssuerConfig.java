@@ -19,6 +19,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Configuration for a single OIDC issuer whose JSON Web Tokens the Sleeper REST API will accept.
@@ -38,9 +39,14 @@ import java.util.Locale;
  *                          JWKS URI is set
  * @param tokenEndpoint     the endpoint where automation can exchange client credentials for a token, reported by the
  *                          API so that scripts do not need to hard code it, or null if not known
+ * @param authEndpoint      the endpoint a browser sends someone to in order to sign in, or null if not known
+ * @param clientId          the application a client signs in to, which a browser must name when it sends someone to
+ *                          sign in, or null if not known
  * @param principalClaim    the claim holding the identifier of the client, used to look them up in the principal
  *                          allow-list
  * @param clockSkewSeconds  how much clock difference to tolerate when checking token expiry
+ * @param requiredClaims    claims a token must carry to be accepted, by name and the value each must hold, or
+ *                          empty to check only the issuer, audience and expiry
  */
 public record OidcIssuerConfig(
         String name,
@@ -49,8 +55,11 @@ public record OidcIssuerConfig(
         String jwksUri,
         String publicKey,
         String tokenEndpoint,
+        String authEndpoint,
+        String clientId,
         String principalClaim,
-        int clockSkewSeconds) {
+        int clockSkewSeconds,
+        Map<String, String> requiredClaims) {
 
     public static final String DEFAULT_PRINCIPAL_CLAIM = "sub";
     public static final int DEFAULT_CLOCK_SKEW_SECONDS = 60;
@@ -84,12 +93,23 @@ public record OidcIssuerConfig(
         if (tokenEndpoint != null) {
             requireAbsoluteUri(tokenEndpoint, "tokenEndpoint");
         }
+        if (authEndpoint != null) {
+            requireAbsoluteUri(authEndpoint, "authEndpoint");
+        }
         requireNonBlank(principalClaim, "principalClaim");
         if (clockSkewSeconds < 0 || clockSkewSeconds > MAX_CLOCK_SKEW_SECONDS) {
             throw new IllegalArgumentException("OIDC issuer \"" + name + "\" must set clockSkewSeconds between 0 and " +
                     MAX_CLOCK_SKEW_SECONDS + ", found: " + clockSkewSeconds);
         }
+        if (requiredClaims == null) {
+            requiredClaims = Map.of();
+        }
+        requiredClaims.forEach((claim, value) -> {
+            requireNonBlank(claim, "required claim name");
+            requireNonBlank(value, "required claim value");
+        });
         audiences = List.copyOf(audiences);
+        requiredClaims = Map.copyOf(requiredClaims);
     }
 
     public static Builder builder() {
@@ -132,8 +152,11 @@ public record OidcIssuerConfig(
         private String jwksUri;
         private String publicKey;
         private String tokenEndpoint;
+        private String authEndpoint;
+        private String clientId;
         private String principalClaim = DEFAULT_PRINCIPAL_CLAIM;
         private int clockSkewSeconds = DEFAULT_CLOCK_SKEW_SECONDS;
+        private Map<String, String> requiredClaims = Map.of();
 
         private Builder() {
         }
@@ -208,6 +231,29 @@ public record OidcIssuerConfig(
         }
 
         /**
+         * Sets the endpoint a browser sends someone to in order to sign in. Reported by the API so that the UI does
+         * not need to be built knowing where its instance's users sign in.
+         *
+         * @param  authEndpoint the endpoint
+         * @return              this builder
+         */
+        public Builder authEndpoint(String authEndpoint) {
+            this.authEndpoint = authEndpoint;
+            return this;
+        }
+
+        /**
+         * Sets the application a client signs in to, which a browser must name when it sends someone to sign in.
+         *
+         * @param  clientId the application identifier
+         * @return          this builder
+         */
+        public Builder clientId(String clientId) {
+            this.clientId = clientId;
+            return this;
+        }
+
+        /**
          * Sets the claim holding the identifier of the client, used to look them up in the principal allow-list.
          *
          * @param  principalClaim the claim name
@@ -229,9 +275,24 @@ public record OidcIssuerConfig(
             return this;
         }
 
+        /**
+         * Sets claims a token must carry to be accepted, checked alongside the issuer, audience and expiry. A token
+         * missing one, or holding a different value for it, is rejected.
+         * <p>
+         * For example, a Cognito user pool signs both an ID token and an access token for the same client. Requiring
+         * "token_use" to be "id" accepts only the first.
+         *
+         * @param  requiredClaims the claims, by name and the value each must hold
+         * @return                this builder
+         */
+        public Builder requiredClaims(Map<String, String> requiredClaims) {
+            this.requiredClaims = requiredClaims;
+            return this;
+        }
+
         public OidcIssuerConfig build() {
             return new OidcIssuerConfig(name, issuer, audiences, jwksUri, publicKey, tokenEndpoint,
-                    principalClaim, clockSkewSeconds);
+                    authEndpoint, clientId, principalClaim, clockSkewSeconds, requiredClaims);
         }
     }
 

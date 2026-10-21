@@ -22,14 +22,22 @@ import org.junit.jupiter.api.Test;
 import sleeper.core.properties.instance.InstanceProperties;
 import sleeper.core.properties.model.OidcIssuerConfig;
 
+import java.util.List;
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_COGNITO_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_IAM_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_OIDC_ISSUERS;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_CLIENT_ID;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_ISSUER;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_LOGIN_URL;
 
 public class AuthSourceRegistryTest {
 
     private static final String ISSUER = "https://idp.internal/realms/sleeper";
+    private static final String POOL_ISSUER = "https://cognito-idp.eu-west-1.amazonaws.com/eu-west-1_abc123";
+    private static final String POOL_LOGIN_URL = "https://sleeper-test-api.auth.eu-west-1.amazoncognito.com";
 
     private final InstanceProperties properties = new InstanceProperties();
 
@@ -60,11 +68,20 @@ public class AuthSourceRegistryTest {
         }
 
         @Test
-        void shouldAuthenticateWithCognitoAlone() {
+        void shouldAuthenticateWithTheUserPoolAlone() {
+            properties.set(API_AUTH_IAM_ENABLED, "false");
+            deployUserPool();
+
+            assertThat(registry().isConfigured()).isTrue();
+        }
+
+        @Test
+        void shouldNotAuthenticateWithAUserPoolThatHasNotBeenDeployed() {
+            // Asking for a pool does not create one, a deployment is required.
             properties.set(API_AUTH_IAM_ENABLED, "false");
             properties.set(API_AUTH_COGNITO_ENABLED, "true");
 
-            assertThat(registry().isConfigured()).isTrue();
+            assertThat(registry().isConfigured()).isFalse();
         }
 
         @Test
@@ -121,8 +138,94 @@ public class AuthSourceRegistryTest {
         }
     }
 
+    @Nested
+    @DisplayName("Trust the user pool created for the instance")
+    class TrustUserPool {
+
+        @Test
+        void shouldVerifyATokenFromTheUserPool() {
+            deployUserPool();
+
+            assertThat(registry().forIssuer(POOL_ISSUER))
+                    .map(OidcIssuerConfig::name)
+                    .contains(AuthSourceRegistry.COGNITO_ISSUER_NAME);
+        }
+
+        @Test
+        void shouldOnlyAcceptATokenMeantForTheApplication() {
+            deployUserPool();
+
+            assertThat(registry().forIssuer(POOL_ISSUER))
+                    .map(OidcIssuerConfig::audiences)
+                    .contains(List.of("the-client-id"));
+        }
+
+        @Test
+        void shouldRefuseATokenOfADifferentKindToTheOneIdentifyingWhoSignedIn() {
+            deployUserPool();
+
+            assertThat(registry().forIssuer(POOL_ISSUER))
+                    .map(OidcIssuerConfig::requiredClaims)
+                    .contains(Map.of("token_use", "id"));
+        }
+
+        @Test
+        void shouldFetchThePoolsKeysRatherThanHoldThem() {
+            deployUserPool();
+
+            assertThat(registry().forIssuer(POOL_ISSUER)).hasValueSatisfying(issuer -> {
+                assertThat(issuer.jwksUri()).isEqualTo(POOL_ISSUER + "/.well-known/jwks.json");
+                assertThat(issuer.publicKey()).isNull();
+            });
+        }
+
+        @Test
+        void shouldTellABrowserWhereToSendSomeoneToSignIn() {
+            deployUserPool();
+
+            assertThat(registry().forIssuer(POOL_ISSUER)).hasValueSatisfying(issuer -> {
+                assertThat(issuer.authEndpoint()).isEqualTo(POOL_LOGIN_URL + "/oauth2/authorize");
+                assertThat(issuer.clientId()).isEqualTo("the-client-id");
+            });
+        }
+
+        @Test
+        void shouldTrustNoPoolWhenNotDeployed() {
+            deployUserPool();
+            properties.set(API_AUTH_COGNITO_ENABLED, "false");
+
+            assertThat(registry().forIssuer(POOL_ISSUER)).isEmpty();
+        }
+
+        @Test
+        void shouldTrustNoPoolBeforeOneHasBeenDeployed() {
+            // The instance is configured to have a pool, but it does not exist until the next deployment.
+            properties.set(API_AUTH_COGNITO_ENABLED, "true");
+
+            assertThat(registry().issuers()).isEmpty();
+        }
+
+        @Test
+        void shouldTrustBothAConfiguredIssuerAndTheUserPool() {
+            setIssuers();
+            deployUserPool();
+
+            assertThat(registry().issuers())
+                    .extracting(OidcIssuerConfig::name)
+                    .containsExactly("corp", AuthSourceRegistry.COGNITO_ISSUER_NAME);
+        }
+
+    }
+
     private AuthSourceRegistry registry() {
         return AuthSourceRegistry.from(properties);
+    }
+
+    private void deployUserPool() {
+        properties.set(API_AUTH_COGNITO_ENABLED, "true");
+        properties.set(REST_API_COGNITO_ISSUER, POOL_ISSUER);
+        properties.set(REST_API_COGNITO_CLIENT_ID, "the-client-id");
+        properties.set(REST_API_COGNITO_LOGIN_URL, POOL_LOGIN_URL);
     }
 
     private void setIssuers() {

@@ -18,6 +18,7 @@ package sleeper.api.rest.security;
 import io.quarkus.oidc.OidcTenantConfig;
 import io.quarkus.oidc.OidcTenantConfigBuilder;
 import io.quarkus.oidc.runtime.OidcTenantConfig.ApplicationType;
+import io.quarkus.oidc.runtime.builders.TokenConfigBuilder;
 
 import sleeper.core.properties.model.OidcIssuerConfig;
 
@@ -26,6 +27,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.TreeMap;
 
 /**
  * Turns an issuer configured for a Sleeper instance into the configuration Quarkus verifies its tokens with.
@@ -65,12 +67,13 @@ public class OidcTenantConfigFactory {
             builder.jwksPath(issuer.jwksUri());
         }
 
-        builder.token()
+        TokenConfigBuilder token = builder.token()
                 .issuer(issuer.issuer())
                 .audience(List.copyOf(issuer.audiences()))
                 .principalClaim(issuer.principalClaim())
-                .lifespanGrace(issuer.clockSkewSeconds())
-                .end();
+                .lifespanGrace(issuer.clockSkewSeconds());
+        issuer.requiredClaims().forEach(token::requiredClaims);
+        token.end();
 
         builder.roles().roleClaimPath(CLAIM_THAT_CARRIES_NO_ROLES).end();
 
@@ -93,6 +96,7 @@ public class OidcTenantConfigFactory {
         String contents = String.join("\n", issuer.name(), issuer.issuer(),
                 String.join(",", issuer.audiences()), issuer.principalClaim(),
                 Integer.toString(issuer.clockSkewSeconds()),
+                new TreeMap<>(issuer.requiredClaims()).toString(),
                 String.valueOf(issuer.jwksUri()), String.valueOf(signingKey));
         return issuer.name() + "#" + digestOf(contents);
     }

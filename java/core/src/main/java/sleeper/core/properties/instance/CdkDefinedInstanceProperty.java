@@ -815,6 +815,20 @@ public interface CdkDefinedInstanceProperty extends InstanceProperty {
             .description("The URL of the API endpoint that authenticates callers by their IAM role.")
             .propertyGroup(InstancePropertyGroup.API)
             .build();
+    CdkDefinedInstanceProperty REST_API_COGNITO_ISSUER = Index.propertyBuilder("sleeper.rest.api.cognito.issuer")
+            .description("The issuer identifier of the Cognito user pool created for the API, matching the iss " +
+                    "claim in the tokens it signs. Only set if a user pool was created.")
+            .propertyGroup(InstancePropertyGroup.API)
+            .build();
+    CdkDefinedInstanceProperty REST_API_COGNITO_CLIENT_ID = Index.propertyBuilder("sleeper.rest.api.cognito.client.id")
+            .description("The ID of the application the Cognito user pool signs users in to. Tokens are only " +
+                    "accepted if they were meant for this application. Only set if a user pool was created.")
+            .propertyGroup(InstancePropertyGroup.API)
+            .build();
+    CdkDefinedInstanceProperty REST_API_COGNITO_LOGIN_URL = Index.propertyBuilder("sleeper.rest.api.cognito.login.url")
+            .description("The URL of the page the Cognito user pool signs users in on. Only set if a user pool was created.")
+            .propertyGroup(InstancePropertyGroup.API)
+            .build();
 
     @Override
     default boolean isSetByCdk() {

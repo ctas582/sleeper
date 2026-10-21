@@ -15,6 +15,7 @@
  */
 package sleeper.api.rest.resource;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -66,7 +67,8 @@ public class AuthInfoResource {
     }
 
     private static Issuer describe(OidcIssuerConfig issuer) {
-        return new Issuer(issuer.name(), issuer.issuer(), issuer.tokenEndpoint());
+        return new Issuer(issuer.name(), issuer.issuer(), issuer.tokenEndpoint(),
+                issuer.authEndpoint(), issuer.clientId());
     }
 
     private static ApiError notConfigured() {
@@ -96,8 +98,12 @@ public class AuthInfoResource {
      * @param name          the name identifying the issuer in this instance's configuration
      * @param issuer        the issuer identifier, matching the iss claim in its tokens
      * @param tokenEndpoint where automation can exchange client credentials for a token, if known
+     * @param authEndpoint  where a browser sends someone to sign in, if known
+     * @param clientId      the application a client signs in to, if known
      */
-    public record Issuer(String name, String issuer, String tokenEndpoint) {
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record Issuer(String name, String issuer, String tokenEndpoint,
+            String authEndpoint, String clientId) {
     }
 
 }
