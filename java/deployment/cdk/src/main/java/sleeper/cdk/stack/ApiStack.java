@@ -132,14 +132,15 @@ public class ApiStack extends NestedStack {
                 .managedLoginVersion(ManagedLoginVersion.NEWER_MANAGED_LOGIN)
                 .build());
 
+        String returnTo = api.getApiEndpoint() + "/";
         UserPoolClient client = userPool.addClient("UserPoolClient", UserPoolClientOptions.builder()
                 .userPoolClientName(String.join("-", "sleeper", instanceId, "api"))
                 .generateSecret(false)
                 .oAuth(OAuthSettings.builder()
                         .flows(OAuthFlows.builder().authorizationCodeGrant(true).build())
                         .scopes(List.of(OAuthScope.OPENID, OAuthScope.PROFILE))
-                        .callbackUrls(List.of(api.getApiEndpoint()))
-                        .logoutUrls(List.of(api.getApiEndpoint()))
+                        .callbackUrls(List.of(returnTo))
+                        .logoutUrls(List.of(returnTo))
                         .build())
                 .build());
 

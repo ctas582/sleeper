@@ -64,9 +64,17 @@
             "GenerateSecret": false,
             "CallbackURLs": [
               {
-                "Fn::GetAtt": [
-                  "ApiF70053CD",
-                  "ApiEndpoint"
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "ApiF70053CD",
+                        "ApiEndpoint"
+                      ]
+                    },
+                    "/"
+                  ]
                 ]
               }
             ],
@@ -83,9 +91,17 @@
             ],
             "LogoutURLs": [
               {
-                "Fn::GetAtt": [
-                  "ApiF70053CD",
-                  "ApiEndpoint"
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Fn::GetAtt": [
+                        "ApiF70053CD",
+                        "ApiEndpoint"
+                      ]
+                    },
+                    "/"
+                  ]
                 ]
               }
             ],

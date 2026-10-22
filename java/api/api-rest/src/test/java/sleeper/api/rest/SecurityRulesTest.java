@@ -42,9 +42,7 @@ class SecurityRulesTest {
             "/api/v1/auth/me",
             "/api/v1/tables",
             "/api/v1",
-            "/api",
-            "/",
-            "/anything-at-all"})
+            "/api"})
         void shouldRefuseAPathThatHasNotBeenAllowed(String path) {
             given()
                     .when().get(path)
@@ -58,6 +56,14 @@ class SecurityRulesTest {
                     .when().get("/api/v1/does-not-exist")
                     .then()
                     .statusCode(401);
+        }
+
+        @Test
+        void shouldServeTheUserInterfaceAtTheRootRatherThanRefuseIt() {
+            given()
+                    .when().get("/")
+                    .then()
+                    .statusCode(200);
         }
 
         @Test

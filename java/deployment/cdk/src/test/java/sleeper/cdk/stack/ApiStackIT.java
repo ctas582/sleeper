@@ -75,6 +75,33 @@ public class ApiStackIT extends SleeperStackTestBase {
     }
 
     @Test
+    void shouldReturnSomebodyToWhereTheInterfaceIsServedAfterSigningIn() {
+        // Given
+        instanceProperties.set(API_AUTH_COGNITO_ENABLED, "true");
+        SleeperCoreStacks core = SleeperCoreStacks.create(rootStack, instanceProps());
+
+        // When
+        ApiStack stack = new ApiStack(rootStack, "Api", instanceProps(), core);
+
+        // Then
+        assertThat(callbackUrlIn(printer.toJson(stack)))
+                .contains("ApiEndpoint")
+                .contains("\"/\"");
+    }
+
+    /**
+     * Reads where the user pool returns somebody to after signing in, out of a generated template.
+     *
+     * @param  template the generated template
+     * @return          the part of it describing that address
+     */
+    private static String callbackUrlIn(String template) {
+        int start = template.indexOf("\"CallbackURLs\"");
+        assertThat(start).isNotNegative();
+        return template.substring(start, template.indexOf("\"LogoutURLs\"", start));
+    }
+
+    @Test
     void shouldSaveCognitoUserPoolDetailsToInstanceProperties() {
         // Given
         instanceProperties.set(API_AUTH_COGNITO_ENABLED, "true");
