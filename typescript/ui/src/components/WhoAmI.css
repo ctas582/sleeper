@@ -1,0 +1,23 @@
+.who-am-i__facts {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 0.5rem 1rem;
+}
+
+.who-am-i__facts dt {
+	font-weight: 600;
+}
+
+.who-am-i__facts dd {
+	margin: 0;
+	font-family: monospace;
+	overflow-wrap: anywhere;
+}
+
+.who-am-i__permissions {
+	font-family: monospace;
+}
+
+.who-am-i__nothing {
+	color: #555;
+}

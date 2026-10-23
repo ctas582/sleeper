@@ -1,0 +1,6 @@
+.not-configured__remediation {
+	background: #f4f4f4;
+	border-left: 3px solid #999;
+	padding: 1rem;
+	overflow-wrap: anywhere;
+}

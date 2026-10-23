@@ -1,0 +1,13 @@
+.select-issuer {
+	text-align: center;
+}
+
+.select-issuer__button {
+	font-size: 1rem;
+	padding: 0.5rem 1.5rem;
+	cursor: pointer;
+}
+
+.select-issuer__detail {
+	color: #555;
+}
