@@ -1,0 +1,35 @@
+name: UI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'typescript/**'
+      - '.github/workflows/ui.yaml'
+  pull_request:
+    paths:
+      - 'typescript/**'
+      - '.github/workflows/ui.yaml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: typescript/ui/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: typescript/ui/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        working-directory: ./typescript/ui
+      - name: Lint
+        run: npm run lint
+        working-directory: ./typescript/ui
+      - name: Test
+        run: npm test
+        working-directory: ./typescript/ui
+      - name: Build
+        run: npm run build
+        working-directory: ./typescript/ui

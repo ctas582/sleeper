@@ -15,6 +15,7 @@ on:
       - 'java/common/dynamodb-tools/**'
       - 'java/core/**'
       - 'java/common/localstack-test/**'
+      - 'typescript/ui/**'
 
 jobs:
   chunk-workflow:

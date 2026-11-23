@@ -24,6 +24,11 @@ jobs:
         with:
           java-version: '17'
           distribution: 'corretto'
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: typescript/ui/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: typescript/ui/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
         if: ${{ ! inputs.skipRust }}
         with:
