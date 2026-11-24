@@ -1,11 +1,6 @@
 name: UI
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'typescript/**'
-      - '.github/workflows/ui.yaml'
   pull_request:
     paths:
       - 'typescript/**'
