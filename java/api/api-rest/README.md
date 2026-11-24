@@ -59,10 +59,10 @@ mvn compile exec:java -pl api/api-rest -Dexec.classpathScope=test \
   -Dexec.args="https://<api-id>.execute-api.<region>.amazonaws.com/api/v1/instance/properties"
 ```
 
-For a quick check by hand, `awscurl` signs a request the same way:
+For a quick check by hand, `awscurl` signs a request the same way. By default it asks for XML, which the API does not produce and refuses with a 406, so ask for JSON:
 
 ```sh
-awscurl --service execute-api --region <region> \
+awscurl --service execute-api --region <region> -H "Accept: application/json" \
   "https://<api-id>.execute-api.<region>.amazonaws.com/api/v1/instance/properties"
 ```
 

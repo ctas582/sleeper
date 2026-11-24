@@ -148,6 +148,13 @@
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
+                <configuration>
+                    <!--
+                        For running the example with exec:java. Quarkus libraries on the classpath start a daemon
+                        thread that never exits, so without this the plugin waits for it and then logs warnings.
+                    -->
+                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
+                </configuration>
                 <executions>
                     <execution>
                         <id>build-ui</id>
