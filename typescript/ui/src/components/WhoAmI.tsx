@@ -34,7 +34,7 @@ export function WhoAmI({ idToken, onSignOut }: Props) {
 
 	useEffect(() => {
 		fetchIdentity(idToken)
-			.then((identity) => setLoading({ state: 'loaded', identity }))
+			.then(identity => setLoading({ state: 'loaded', identity }))
 			.catch((error: unknown) => setLoading({
 				state: 'failed',
 				message: error instanceof Error ? error.message : String(error),
@@ -68,7 +68,7 @@ export function WhoAmI({ idToken, onSignOut }: Props) {
 			<h2>What you may do</h2>
 			{identity.permissions.length > 0 ? (
 				<ul className="who-am-i__permissions">
-					{identity.permissions.map((granted) => (
+					{identity.permissions.map(granted => (
 						<li key={granted.permission}>
 							{granted.permission}
 							{granted.tables?.length ? ` on ${granted.tables.join(', ')}` : ' on every table'}

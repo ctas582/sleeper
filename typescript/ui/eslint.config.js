@@ -45,6 +45,7 @@ export default tseslint.config(
 			'@stylistic/indent': ['error', 'tab'],
 			'@stylistic/no-mixed-spaces-and-tabs': ['error', 'smart-tabs'],
 			'@stylistic/semi': ['error', 'never'],
+			'@stylistic/arrow-parens': ['error', 'as-needed'],
 		},
 	},
 	{
