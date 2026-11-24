@@ -30,7 +30,7 @@ type Loading =
 	| { state: 'failed'; message: string }
 
 export function WhoAmI({ idToken, onSignOut }: Props) {
-	const [loading, setLoading] = useState<Loading>({ state: 'loading' });
+	const [loading, setLoading] = useState<Loading>({ state: 'loading' })
 
 	useEffect(() => {
 		fetchIdentity(idToken)

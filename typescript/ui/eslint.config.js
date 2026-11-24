@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-import js from '@eslint/js';
-import globals from 'globals';
-import reactHooks from 'eslint-plugin-react-hooks';
-import reactRefresh from 'eslint-plugin-react-refresh';
-import licenseHeader from 'eslint-plugin-license-header';
-import stylistic from '@stylistic/eslint-plugin';
-import vitest from '@vitest/eslint-plugin';
-import tseslint from 'typescript-eslint';
+import js from '@eslint/js'
+import globals from 'globals'
+import reactHooks from 'eslint-plugin-react-hooks'
+import reactRefresh from 'eslint-plugin-react-refresh'
+import licenseHeader from 'eslint-plugin-license-header'
+import stylistic from '@stylistic/eslint-plugin'
+import vitest from '@vitest/eslint-plugin'
+import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
 	{ ignores: ['dist'] },
@@ -44,6 +44,7 @@ export default tseslint.config(
 			'license-header/header': ['error', './licence-header.js'],
 			'@stylistic/indent': ['error', 'tab'],
 			'@stylistic/no-mixed-spaces-and-tabs': ['error', 'smart-tabs'],
+			'@stylistic/semi': ['error', 'never'],
 		},
 	},
 	{
@@ -54,4 +55,4 @@ export default tseslint.config(
 			'vitest/prefer-importing-vitest-globals': 'error',
 		},
 	},
-);
+)
