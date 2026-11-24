@@ -21,7 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import sleeper.api.auth.testutils.TestJwts;
-import sleeper.api.rest.testutils.LocalStackTestResource;
+import sleeper.api.rest.testutils.LocalAwsTestResource;
 import sleeper.core.properties.instance.InstanceProperties;
 
 import java.util.List;
@@ -40,7 +40,7 @@ import static sleeper.core.properties.instance.ApiProperty.API_AUTH_OIDC_ISSUERS
  * trusted issuer could otherwise claim any access they liked.
  */
 @QuarkusTest
-@QuarkusTestResource(LocalStackTestResource.class)
+@QuarkusTestResource(LocalAwsTestResource.class)
 class TokenRolesIT {
 
     private static final String ISSUER = "https://idp.internal/realms/sleeper";

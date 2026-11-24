@@ -21,7 +21,7 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import org.junit.jupiter.api.Test;
 
-import sleeper.api.rest.testutils.LocalStackTestResource;
+import sleeper.api.rest.testutils.LocalAwsTestResource;
 
 import java.util.Map;
 
@@ -31,7 +31,7 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
 
 @QuarkusTest
-@QuarkusTestResource(LocalStackTestResource.class)
+@QuarkusTestResource(LocalAwsTestResource.class)
 @TestProfile(UnreadableConfigurationIT.PointAtABucketThatDoesNotExist.class)
 class UnreadableConfigurationIT {
 

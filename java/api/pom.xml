@@ -19,7 +19,7 @@
     <parent>
         <artifactId>aws</artifactId>
         <groupId>sleeper</groupId>
-        <version>0.37.6-SNAPSHOT</version>
+        <version>0.38.3-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
@@ -39,6 +39,18 @@
 
     <dependencyManagement>
         <dependencies>
+            <!--
+                Imported ahead of the Quarkus BOMs so that every AWS SDK module matches the version used by the rest
+                of Sleeper. Otherwise modules not pinned in the root POM come from the Quarkus BOM at a different
+                version, and the SDK fails at runtime.
+            -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${aws-java-sdk-v2.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>io.quarkus.platform</groupId>
                 <artifactId>quarkus-bom</artifactId>

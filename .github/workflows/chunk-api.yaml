@@ -14,7 +14,7 @@ on:
       - 'java/configuration/**'
       - 'java/common/dynamodb-tools/**'
       - 'java/core/**'
-      - 'java/common/localstack-test/**'
+      - 'java/common/local-aws-test/**'
       - 'typescript/ui/**'
 
 jobs:

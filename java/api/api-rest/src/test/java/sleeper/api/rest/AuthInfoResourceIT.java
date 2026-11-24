@@ -20,7 +20,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import sleeper.api.rest.testutils.LocalStackTestResource;
+import sleeper.api.rest.testutils.LocalAwsTestResource;
 import sleeper.core.properties.instance.InstanceProperties;
 
 import java.util.List;
@@ -38,7 +38,7 @@ import static sleeper.core.properties.instance.ApiProperty.API_AUTH_IAM_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_OIDC_ISSUERS;
 
 @QuarkusTest
-@QuarkusTestResource(LocalStackTestResource.class)
+@QuarkusTestResource(LocalAwsTestResource.class)
 class AuthInfoResourceIT {
 
     private static final String ISSUER = "https://idp.internal/realms/sleeper";

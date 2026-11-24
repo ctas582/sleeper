@@ -21,7 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import sleeper.api.auth.testutils.TestJwts;
-import sleeper.api.rest.testutils.LocalStackTestResource;
+import sleeper.api.rest.testutils.LocalAwsTestResource;
 import sleeper.core.properties.instance.InstanceProperties;
 
 import static io.restassured.RestAssured.given;
@@ -41,7 +41,7 @@ import static sleeper.core.properties.instance.ApiProperty.API_AUTH_OIDC_ISSUERS
  * apart.
  */
 @QuarkusTest
-@QuarkusTestResource(LocalStackTestResource.class)
+@QuarkusTestResource(LocalAwsTestResource.class)
 class RequiredClaimsIT {
 
     private static final String ISSUER = "https://idp.internal/realms/sleeper";

@@ -15,25 +15,25 @@
  */
 package sleeper.api.rest.testutils;
 
+import io.floci.testcontainers.FlociContainer;
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
-import org.testcontainers.localstack.LocalStackContainer;
 
-import sleeper.localstack.test.SleeperLocalStackContainer;
+import sleeper.local.aws.test.SleeperLocalAwsContainer;
 
 import java.util.Map;
 
 /**
- * Points the API at a LocalStack container instead of AWS.
+ * Points the API at a local AWS container instead of AWS.
  */
-public class LocalStackTestResource implements QuarkusTestResourceLifecycleManager {
+public class LocalAwsTestResource implements QuarkusTestResourceLifecycleManager {
 
     public static final String CONFIG_BUCKET = "sleeper-test-instance-config";
 
     @Override
     public Map<String, String> start() {
-        LocalStackContainer container = SleeperLocalStackContainer.INSTANCE;
+        FlociContainer container = SleeperLocalAwsContainer.INSTANCE;
         return Map.of(
-                "quarkus.s3.endpoint-override", container.getEndpoint().toString(),
+                "quarkus.s3.endpoint-override", container.getEndpoint(),
                 "quarkus.s3.aws.region", container.getRegion(),
                 "quarkus.s3.aws.credentials.type", "static",
                 "quarkus.s3.aws.credentials.static-provider.access-key-id", container.getAccessKey(),

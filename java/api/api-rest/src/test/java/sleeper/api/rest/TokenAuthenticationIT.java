@@ -21,7 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import sleeper.api.auth.testutils.TestJwts;
-import sleeper.api.rest.testutils.LocalStackTestResource;
+import sleeper.api.rest.testutils.LocalAwsTestResource;
 import sleeper.core.properties.instance.InstanceProperties;
 
 import static io.restassured.RestAssured.given;
@@ -37,7 +37,7 @@ import static sleeper.core.properties.instance.ApiProperty.API_AUTH_OIDC_ISSUERS
  * Checks that a client presenting a token is authenticated against the issuers its instance trusts.
  */
 @QuarkusTest
-@QuarkusTestResource(LocalStackTestResource.class)
+@QuarkusTestResource(LocalAwsTestResource.class)
 class TokenAuthenticationIT {
 
     private static final String ISSUER = "https://idp.internal/realms/sleeper";

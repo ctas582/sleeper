@@ -22,10 +22,10 @@ import sleeper.core.properties.instance.InstanceProperties;
 
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.CONFIG_BUCKET;
 import static sleeper.core.properties.testutils.InstancePropertiesTestHelper.createTestInstanceProperties;
-import static sleeper.localstack.test.SleeperLocalStackClients.S3_CLIENT;
+import static sleeper.local.aws.test.SleeperLocalAwsClients.S3_CLIENT;
 
 /**
- * Gives a test a Sleeper instance for the API to serve, held in LocalStack.
+ * Gives a test a Sleeper instance for the API to serve, held in a local AWS container.
  */
 public class SleeperInstanceForTest {
 
@@ -38,7 +38,7 @@ public class SleeperInstanceForTest {
      */
     public static void createConfigBucket() {
         try {
-            S3_CLIENT.createBucket(builder -> builder.bucket(LocalStackTestResource.CONFIG_BUCKET));
+            S3_CLIENT.createBucket(builder -> builder.bucket(LocalAwsTestResource.CONFIG_BUCKET));
         } catch (BucketAlreadyOwnedByYouException e) {
             // Another test created it already.
         }
@@ -52,7 +52,7 @@ public class SleeperInstanceForTest {
      */
     public static InstanceProperties instance() {
         InstanceProperties properties = createTestInstanceProperties();
-        properties.set(CONFIG_BUCKET, LocalStackTestResource.CONFIG_BUCKET);
+        properties.set(CONFIG_BUCKET, LocalAwsTestResource.CONFIG_BUCKET);
         return properties;
     }
 
