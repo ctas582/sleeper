@@ -171,10 +171,6 @@ Apache Commons Logging (commons-logging:commons-logging:1.*)
 
 - Apache License, Version 2.0
 
-Apache Commons BeanUtils (commons-beanutils:commons-beanutils:1.*)
-
-- Apache License, Version 2.0
-
 Apache HttpClient (org.apache.httpcomponents:httpcore:4.*, org.apache.httpcomponents:httpclient:4.*, org.apache.httpcomponents:httpclient4:4.*, org.apache.httpcomponents.client5:*:5.*, org.apache.httpcomponents.core5:*:5.*)
 
 - Apache License, Version 2.0
@@ -332,6 +328,10 @@ Docker Java (com.github.docker-java:docker-java-*:3.*)
 - Apache License, Version 2.0
 
 Testcontainers (org.testcontainers:*:2.*)
+
+- MIT License
+
+Floci (io.floci:*:2.*)
 
 - MIT License
 

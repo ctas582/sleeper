@@ -25,10 +25,12 @@ public class QueryClientTestConstants {
 
     public static final String EXACT_QUERY_OPTION = "e";
     public static final String RANGE_QUERY_OPTION = "r";
+    public static final String FILE_QUERY_OPTION = "f";
     public static final String YES_OPTION = "y";
     public static final String NO_OPTION = "n";
     public static final String EXIT_OPTION = "";
-    public static final String PROMPT_QUERY_TYPE = "Exact (e) or range (r) query? \n";
+    public static final String PROMPT_QUERY_TYPE = "Exact (e), range (r), or file of keys/ranges (f) query? \n";
+    public static final String PROMPT_QUERY_FILE = "Enter path to file of keys/ranges, one per line (single value for an exact query, min,max for a range): \n";
     public static final String PROMPT_EXACT_KEY_LONG_TYPE = "Enter a key for row key field key of type LongType{}: \n";
     public static final String PROMPT_MIN_INCLUSIVE = "Is the minimum inclusive? (y/n) \n";
     public static final String PROMPT_MAX_INCLUSIVE = "Is the maximum inclusive? (y/n) \n";
@@ -38,4 +40,8 @@ public class QueryClientTestConstants {
             "Enter SQL statement (blank for none): \n";
     public static final String SEND_TO_S3_OPTION = "s";
     public static final String SEND_TO_SQS_OPTION = "q";
+    public static final String SEND_TO_CONSOLE_OPTION = "c";
+    public static final String PRINT_WHEN_FINISHED_OPTION = "f";
+    public static final String PRINT_AS_SUBQUERIES_FINISH_OPTION = "a";
+    public static final String DEFAULT_RESULTS_READ_THREADS_OPTION = "";
 }

@@ -20,11 +20,13 @@ import sleeper.bulkimport.core.configuration.BulkImportPlatform;
 import sleeper.bulkimport.core.job.BulkImportJob;
 import sleeper.clients.query.FakeWebSocketConnection;
 import sleeper.clients.query.QueryWebSocketClient;
+import sleeper.core.iterator.closeable.WrappedIterator;
 import sleeper.core.properties.instance.InstanceProperties;
 import sleeper.core.properties.table.TableProperties;
 import sleeper.core.properties.table.TablePropertiesProvider;
 import sleeper.core.properties.table.TablePropertiesStore;
 import sleeper.core.properties.testutils.InMemoryTableProperties;
+import sleeper.core.row.Row;
 import sleeper.core.row.testutils.InMemoryRowStore;
 import sleeper.core.statestore.StateStoreProvider;
 import sleeper.core.statestore.testutils.InMemoryTransactionLogStateStore;
@@ -34,11 +36,16 @@ import sleeper.core.table.InMemoryTableIndex;
 import sleeper.ingest.batcher.core.IngestBatcherSubmitRequest;
 import sleeper.ingest.core.job.IngestJob;
 import sleeper.ingest.runner.testutils.InMemoryIngest;
+import sleeper.query.core.model.Query;
 import sleeper.query.core.rowretrieval.InMemoryLeafPartitionRowRetriever;
+import sleeper.query.core.tracker.InMemoryQueryTracker;
+import sleeper.query.runner.results.QueryResultsReader;
 import sleeper.sketches.testutils.InMemorySketchesStore;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 
@@ -59,6 +66,9 @@ public class InMemorySleeperInstance {
     private final Map<BulkImportPlatform, Queue<BulkImportJob>> bulkImportQueues = new HashMap<>();
     private final Queue<IngestBatcherSubmitRequest> ingestBatcherQueue = new LinkedList<>();
     private final Queue<BulkExportQuery> bulkExportQueue = new LinkedList<>();
+    private final Queue<Query> queryQueue = new LinkedList<>();
+    private final Map<String, Map<String, List<Row>>> queryResultsById = new HashMap<>();
+    private final InMemoryQueryTracker queryTracker;
     private final FakeWebSocketConnection webSocketConnection;
 
     public InMemorySleeperInstance(InstanceProperties properties) {
@@ -66,6 +76,7 @@ public class InMemorySleeperInstance {
         this.tablePropertiesProvider = new TablePropertiesProvider(properties, tablePropertiesStore);
         this.stateStoreProvider = InMemoryTransactionLogStateStore.createProvider(properties, transactionLogsPerTable);
         this.webSocketConnection = new FakeWebSocketConnection();
+        this.queryTracker = new InMemoryQueryTracker(properties);
     }
 
     public FakeWebSocketConnection getFakeWebSocketConnection() {
@@ -89,7 +100,24 @@ public class InMemorySleeperInstance {
                 .bulkImportJobSender(bulkImportSender())
                 .ingestBatcherSender(ingestBatcherQueue::add)
                 .bulkExportQuerySender(bulkExportQueue::add)
-                .queryWebSocketSender(queryWebSocketSender());
+                .queryWebSocketSender(queryWebSocketSender())
+                .querySender(queryQueue::add)
+                .queryResultsReader(queryResultsReader())
+                .queryTrackerStore(queryTracker);
+    }
+
+    /**
+     * Creates a reader for query results files held in memory. Files can be added with
+     * {@link #publishQueryResultsFile}.
+     *
+     * @return the reader
+     */
+    public QueryResultsReader queryResultsReader() {
+        return (tableName, queryId) -> queryResultsById
+                .getOrDefault(queryId, Map.of()).entrySet().stream()
+                .map(file -> new QueryResultsReader.ResultsFile(file.getKey(),
+                        () -> new WrappedIterator<>(file.getValue().iterator())))
+                .toList();
     }
 
     /**
@@ -215,6 +243,47 @@ public class InMemorySleeperInstance {
      */
     public Queue<IngestJob> ingestQueue() {
         return ingestQueue;
+    }
+
+    /**
+     * Retrieves the in-memory queue of queries submitted for processing.
+     *
+     * @return the queue
+     */
+    public Queue<Query> queryQueue() {
+        return queryQueue;
+    }
+
+    /**
+     * Retrieves the in-memory query tracker.
+     *
+     * @return the tracker
+     */
+    public InMemoryQueryTracker queryTracker() {
+        return queryTracker;
+    }
+
+    /**
+     * Sets the rows that will be returned when reading the results of a query with the given ID, as a single results
+     * file.
+     *
+     * @param queryId the query ID
+     * @param results the rows in the results of the query
+     */
+    public void setQueryResults(String queryId, List<Row> results) {
+        publishQueryResultsFile(queryId, "results.parquet", results);
+    }
+
+    /**
+     * Adds a results file for a query with the given ID, as published by a subquery that has finished. May be called
+     * repeatedly to simulate subqueries publishing their results while the query is running.
+     *
+     * @param queryId  the query ID
+     * @param filename the name of the results file, unique within the results of the query
+     * @param results  the rows in the results file
+     */
+    public void publishQueryResultsFile(String queryId, String filename, List<Row> results) {
+        queryResultsById.computeIfAbsent(queryId, id -> new LinkedHashMap<>()).put(filename, results);
     }
 
     /**

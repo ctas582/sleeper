@@ -21,13 +21,21 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 import static sleeper.clients.report.query.QueryTrackerReporterTestHelper.getJsonReport;
 import static sleeper.clients.report.query.QueryTrackerReporterTestHelper.mixedQueries;
+import static sleeper.clients.report.query.QueryTrackerReporterTestHelper.singleQueryWithProgress;
 import static sleeper.clients.testutil.ClientTestUtils.example;
 
 public class JsonQueryTrackerReporterTest {
     @Test
     void shouldRunReportWithMixedQueries() throws Exception {
         // When/Then
-        assertThat(getJsonReport(TrackerQuery.ALL, mixedQueries()))
+        assertThat(getJsonReport(QueryTrackerQuery.ALL, mixedQueries()))
                 .isEqualTo(example("reports/query/json/mixedQueries.json"));
+    }
+
+    @Test
+    void shouldRunReportForSingleQueryWithProgress() throws Exception {
+        // When/Then
+        assertThat(getJsonReport(QueryTrackerQuery.FOR_QUERY, singleQueryWithProgress()))
+                .isEqualTo(example("reports/query/json/queryWithProgress.json"));
     }
 }

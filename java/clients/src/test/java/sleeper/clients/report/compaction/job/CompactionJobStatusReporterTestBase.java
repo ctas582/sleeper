@@ -16,13 +16,14 @@
 
 package sleeper.clients.report.compaction.job;
 
-import sleeper.clients.report.job.query.JobQuery.Type;
+import sleeper.clients.report.job.query.JobQueryType;
 import sleeper.clients.testutil.ToStringConsoleOutput;
 import sleeper.compaction.core.job.CompactionJob;
 import sleeper.compaction.core.job.CompactionJobTestDataHelper;
 import sleeper.core.partition.PartitionsBuilderSplitsFirst;
 import sleeper.core.tracker.compaction.job.query.CompactionJobCreatedStatus;
 import sleeper.core.tracker.compaction.job.query.CompactionJobStatus;
+import sleeper.core.tracker.job.run.JobRunSummary;
 import sleeper.core.tracker.job.run.JobRunTime;
 import sleeper.core.tracker.job.run.JobRuns;
 import sleeper.core.tracker.job.run.RowsProcessed;
@@ -40,6 +41,7 @@ import static sleeper.clients.report.StatusReporterTestHelper.task;
 import static sleeper.compaction.core.job.CompactionJobStatusFromJobTestData.compactionJobCreated;
 import static sleeper.core.testutils.SupplierTestHelper.exampleUUID;
 import static sleeper.core.tracker.compaction.job.CompactionJobStatusTestData.compactionCommittedStatus;
+import static sleeper.core.tracker.compaction.job.CompactionJobStatusTestData.compactionFailedStatus;
 import static sleeper.core.tracker.compaction.job.CompactionJobStatusTestData.compactionFinishedStatus;
 import static sleeper.core.tracker.compaction.job.CompactionJobStatusTestData.compactionStartedStatus;
 import static sleeper.core.tracker.compaction.job.CompactionJobStatusTestData.failedCompactionRun;
@@ -175,6 +177,22 @@ public abstract class CompactionJobStatusReporterTestBase {
                 .build());
     }
 
+    protected static List<CompactionJobStatus> jobSucceededWithFailure() {
+        CompactionJobTestDataHelper dataHelper = new CompactionJobTestDataHelper();
+        CompactionJob job = dataHelper.singleFileCompaction(job(1));
+        Instant creationTime = Instant.parse("2022-10-13T12:00:00.001Z");
+        Instant startedTime = Instant.parse("2022-10-13T12:00:10.000Z");
+        Instant commitTime = Instant.parse("2022-10-13T12:00:30.000Z");
+        Instant failedTime = Instant.parse("2022-10-13T12:00:31.000Z");
+        JobRunSummary summary = summary(startedTime, Duration.ofMillis(123), 600, 300);
+        return List.of(
+                compactionJobCreated(job, creationTime, jobRunOnTask("task-id",
+                        compactionStartedStatus(summary.getStartTime()),
+                        compactionFinishedStatus(summary),
+                        compactionCommittedStatus(commitTime),
+                        compactionFailedStatus(failedTime, List.of("File not found"))))); // A double commit caused the second one to fail to validate
+    }
+
     protected static List<CompactionJobStatus> partialJobStatuses() {
         return CompactionJobStatus.listFrom(records().fromUpdates(
                 forJobRunOnTask("job-1",
@@ -188,7 +206,7 @@ public abstract class CompactionJobStatusReporterTestBase {
 
     protected static String verboseReportString(
             Function<PrintStream, CompactionJobStatusReporter> getReporter,
-            List<CompactionJobStatus> statusList, Type queryType) {
+            List<CompactionJobStatus> statusList, JobQueryType queryType) {
         ToStringConsoleOutput out = new ToStringConsoleOutput();
         getReporter.apply(out.getPrintStream())
                 .report(statusList, queryType);

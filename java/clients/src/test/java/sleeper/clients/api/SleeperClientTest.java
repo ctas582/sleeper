@@ -34,17 +34,29 @@ import sleeper.core.row.Row;
 import sleeper.core.schema.Field;
 import sleeper.core.schema.Schema;
 import sleeper.core.schema.type.StringType;
+import sleeper.core.util.PollWithRetries;
+import sleeper.core.util.ThreadSleepTestHelper;
 import sleeper.ingest.batcher.core.IngestBatcherSubmitRequest;
 import sleeper.ingest.core.job.IngestJob;
 import sleeper.ingest.runner.impl.IngestCoordinator;
 import sleeper.query.core.model.Query;
 import sleeper.query.core.model.QuerySerDe;
+import sleeper.query.core.output.ResultsOutput;
+import sleeper.query.core.output.ResultsOutputInfo;
 import sleeper.query.core.output.ResultsOutputLocation;
 import sleeper.query.core.rowretrieval.QueryExecutor;
+import sleeper.query.core.tracker.QueryState;
+import sleeper.query.core.tracker.TrackedQuery;
+import sleeper.query.runner.output.S3ResultsOutput;
+import sleeper.query.runner.output.SQSResultsOutput;
+import sleeper.query.runner.results.QueryFailedException;
+import sleeper.query.runner.results.QueryResultsNotFoundException;
+import sleeper.query.runner.results.QueryResultsReader;
 import sleeper.query.runner.websocket.QueryWebSocketMessage;
 import sleeper.query.runner.websocket.QueryWebSocketMessageSerDe;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +64,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static sleeper.core.properties.table.TableProperty.TABLE_NAME;
 import static sleeper.core.properties.table.TableProperty.TABLE_ONLINE;
 import static sleeper.core.properties.testutils.InstancePropertiesTestHelper.createTestInstanceProperties;
@@ -92,6 +105,559 @@ class SleeperClientTest {
                 .isInstanceOf(NullPointerException.class).hasMessageContaining("bulkExportQuerySender");
         assertThatThrownBy(() -> instance.sleeperClientBuilder().queryWebSocketSender(null).build())
                 .isInstanceOf(NullPointerException.class).hasMessageContaining("queryWebSocketSender");
+        assertThatThrownBy(() -> instance.sleeperClientBuilder().querySender(null).build())
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("querySender");
+        assertThatThrownBy(() -> instance.sleeperClientBuilder().queryResultsReader(null).build())
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("queryResultsReader");
+        assertThatThrownBy(() -> instance.sleeperClientBuilder().queryTrackerStore(null).build())
+                .isInstanceOf(NullPointerException.class).hasMessageContaining("queryTrackerStore");
+    }
+
+    @Test
+    void shouldSubmitQueryForProcessing() {
+        // Given
+        TableProperties tableProperties = createTestTableProperties(instanceProperties, schema);
+        tableProperties.set(TABLE_NAME, "query-table");
+        sleeperClient.addTable(tableProperties, List.of());
+        Query query = exactQuery("test-query", "A", "query-table");
+
+        // When
+        String queryId = sleeperClient.submitQuery(query);
+
+        // Then
+        assertThat(queryId).isEqualTo("test-query");
+        assertThat(instance.queryQueue()).containsExactly(query);
+    }
+
+    @Test
+    void shouldGetStatusOfQueryAndItsSubqueries() {
+        // Given
+        TableProperties tableProperties = createTestTableProperties(instanceProperties, schema);
+        tableProperties.set(TABLE_NAME, "query-table");
+        sleeperClient.addTable(tableProperties, List.of());
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryInProgress(query);
+
+        // When
+        List<TrackedQuery> status = sleeperClient.getQueryStatus("test-query");
+
+        // Then
+        assertThat(status)
+                .extracting(TrackedQuery::getQueryId, TrackedQuery::getLastKnownState)
+                .containsExactly(tuple("test-query", QueryState.IN_PROGRESS));
+    }
+
+    @Test
+    void shouldGetNoStatusForUntrackedQuery() {
+        // When / Then
+        assertThat(sleeperClient.getQueryStatus("not-a-query")).isEmpty();
+    }
+
+    @Test
+    void shouldWaitForQueryThatHasAlreadyFinished() throws Exception {
+        // Given
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryCompleted(query, new ResultsOutputInfo(123L, List.of()));
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollRecordingWaits(foundWaits);
+
+        // When
+        TrackedQuery status = sleeperClient.waitForQuery("test-query", poll);
+
+        // Then the query finished without any waiting
+        assertThat(status.getLastKnownState()).isEqualTo(QueryState.COMPLETED);
+        assertThat(status.getRowCount()).isEqualTo(123L);
+        assertThat(foundWaits).isEmpty();
+    }
+
+    @Test
+    void shouldWaitForQueryThatFinishesWhilePolling() throws Exception {
+        // Given a query that is in progress, and completes during the first wait between polls
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryInProgress(query);
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollWithWaitAction(foundWaits,
+                () -> instance.queryTracker().queryCompleted(query, new ResultsOutputInfo(456L, List.of())));
+
+        // When
+        TrackedQuery status = sleeperClient.waitForQuery("test-query", poll);
+
+        // Then
+        assertThat(status.getLastKnownState()).isEqualTo(QueryState.COMPLETED);
+        assertThat(foundWaits).hasSize(1);
+    }
+
+    @Test
+    void shouldWaitForQueryThatIsNotTrackedYet() throws Exception {
+        // Given a query that is not yet in the tracker, and fails during the first wait between polls
+        Query query = exactQuery("test-query", "A", "query-table");
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollWithWaitAction(foundWaits,
+                () -> instance.queryTracker().queryFailed(query, new Exception("Query failed")));
+
+        // When
+        TrackedQuery status = sleeperClient.waitForQuery("test-query", poll);
+
+        // Then
+        assertThat(status.getLastKnownState()).isEqualTo(QueryState.FAILED);
+        assertThat(foundWaits).hasSize(1);
+    }
+
+    @Test
+    void shouldSubmitQueryAndWaitUntilItFinishes() throws Exception {
+        // Given a query that completes during the first wait between polls, after it was submitted
+        Query query = exactQuery("test-query", "A", "query-table");
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollWithWaitAction(foundWaits,
+                () -> instance.queryTracker().queryCompleted(query, new ResultsOutputInfo(456L, List.of())));
+
+        // When
+        TrackedQuery status = sleeperClient.submitQueryAndWait(query, poll);
+
+        // Then the query was submitted for processing and polled until it finished
+        assertThat(instance.queryQueue()).containsExactly(query);
+        assertThat(status.getLastKnownState()).isEqualTo(QueryState.COMPLETED);
+        assertThat(status.getRowCount()).isEqualTo(456L);
+        assertThat(foundWaits).hasSize(1);
+    }
+
+    @Test
+    void shouldSubmitQueryAndGetResultsWhenItFinishes() throws Exception {
+        // Given a query that completes during the first wait between polls, after it was submitted
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.setQueryResults("test-query", List.of(new Row(Map.of("key", "A"))));
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollWithWaitAction(foundWaits,
+                () -> instance.queryTracker().queryCompleted(query, new ResultsOutputInfo(1L, List.of())));
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = sleeperClient.submitQueryAndGetResults(query, poll)) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then
+        assertThat(instance.queryQueue()).containsExactly(query);
+        assertThat(rows).containsExactly(new Row(Map.of("key", "A")));
+        assertThat(foundWaits).hasSize(1);
+    }
+
+    @Test
+    void shouldGetNoResultsWithoutReadingResultsOutputWhenQueryCompletedWithNoRows() throws Exception {
+        // Given a query that completes with no rows and publishes no results files, e.g. when it was split into no
+        // subqueries
+        Query query = exactQuery("test-query", "A", "query-table");
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollWithWaitAction(foundWaits,
+                () -> instance.queryTracker().queryCompleted(query, new ResultsOutputInfo(0L, List.of())));
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = sleeperClient.submitQueryAndGetResults(query, poll)) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then no results were read, and no attempt was made to read the results output, which would have failed as
+        // no results were published
+        assertThat(rows).isEmpty();
+    }
+
+    @Test
+    void shouldFailGettingResultsForQueryThatFailed() {
+        // Given a query that fails during the first wait between polls, after it was submitted
+        Query query = exactQuery("test-query", "A", "query-table");
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollWithWaitAction(foundWaits,
+                () -> instance.queryTracker().queryFailed(query, new Exception("Query failed")));
+
+        // When / Then
+        assertThatThrownBy(() -> sleeperClient.submitQueryAndGetResults(query, poll))
+                .isInstanceOf(QueryFailedException.class)
+                .hasMessageContaining("test-query")
+                .hasMessageContaining("FAILED");
+    }
+
+    @Test
+    void shouldSubmitQueryAndGetResultsWhenResultsPublisherConfigIsExplicitlySetToS3() throws Exception {
+        // Given a query that completes during the first wait between polls, after it was submitted
+        Query query = exactQuery("test-query", "A", "query-table")
+                .withResultsPublisherConfig(Map.of(ResultsOutput.DESTINATION, S3ResultsOutput.S3));
+        instance.setQueryResults("test-query", List.of(new Row(Map.of("key", "A"))));
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollWithWaitAction(foundWaits,
+                () -> instance.queryTracker().queryCompleted(query, new ResultsOutputInfo(1L, List.of())));
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = sleeperClient.submitQueryAndGetResults(query, poll)) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then
+        assertThat(rows).containsExactly(new Row(Map.of("key", "A")));
+    }
+
+    @Test
+    void shouldRefuseGettingResultsForQueryThatPublishesResultsSomewhereOtherThanS3() {
+        // Given
+        Query query = exactQuery("test-query", "A", "query-table")
+                .withResultsPublisherConfig(Map.of(ResultsOutput.DESTINATION, SQSResultsOutput.SQS));
+
+        // When / Then
+        assertThatThrownBy(() -> sleeperClient.submitQueryAndGetResults(query))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Query results will not be published to S3");
+        assertThat(instance.queryQueue()).isEmpty();
+    }
+
+    @Test
+    void shouldRefuseGettingResultsForQueryThatPublishesResultsToANonDefaultBucket() {
+        // Given
+        Query query = exactQuery("test-query", "A", "query-table")
+                .withResultsPublisherConfig(Map.of(
+                        ResultsOutput.DESTINATION, S3ResultsOutput.S3,
+                        S3ResultsOutput.S3_BUCKET, "custom-bucket"));
+
+        // When / Then
+        assertThatThrownBy(() -> sleeperClient.submitQueryAndGetResults(query))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Query results will not be published to the default query results bucket");
+        assertThat(instance.queryQueue()).isEmpty();
+    }
+
+    @Test
+    void shouldGetResultsOfQueryByTableNameAndQueryId() throws Exception {
+        // Given
+        instance.setQueryResults("test-query", List.of(new Row(Map.of("key", "A"))));
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = sleeperClient.getQueryResults("query-table", "test-query")) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then
+        assertThat(rows).containsExactly(new Row(Map.of("key", "A")));
+    }
+
+    @Test
+    void shouldGetResultsOfQueryThatAlreadyFinished() throws Exception {
+        // Given
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.setQueryResults("test-query", List.of(
+                new Row(Map.of("key", "A")),
+                new Row(Map.of("key", "B"))));
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = sleeperClient.getQueryResults(query)) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then
+        assertThat(rows).containsExactly(
+                new Row(Map.of("key", "A")),
+                new Row(Map.of("key", "B")));
+    }
+
+    @Test
+    void shouldFailGettingResultsForQueryThatWasNeverProcessed() {
+        // Given
+        Query query = exactQuery("test-query", "A", "query-table");
+
+        // When / Then
+        assertThatThrownBy(() -> sleeperClient.getQueryResults(query))
+                .isInstanceOf(QueryResultsNotFoundException.class)
+                .hasMessageContaining("test-query");
+    }
+
+    @Test
+    void shouldGetResultsOfQueryReadingFilesInParallel() throws Exception {
+        // Given a client configured to read results files in parallel, and a query with multiple results files
+        SleeperClient client = instance.sleeperClientBuilder()
+                .queryResultsReader(instance.queryResultsReader().withFileReadThreads(2))
+                .build();
+        instance.publishQueryResultsFile("test-query", "file-1.parquet", List.of(
+                new Row(Map.of("key", "A")),
+                new Row(Map.of("key", "B"))));
+        instance.publishQueryResultsFile("test-query", "file-2.parquet", List.of(
+                new Row(Map.of("key", "C"))));
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = client.getQueryResults("query-table", "test-query")) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then
+        assertThat(rows).containsExactlyInAnyOrder(
+                new Row(Map.of("key", "A")),
+                new Row(Map.of("key", "B")),
+                new Row(Map.of("key", "C")));
+    }
+
+    @Test
+    void shouldFailGettingResultsInParallelForQueryThatWasNeverProcessed() {
+        // Given
+        SleeperClient client = instance.sleeperClientBuilder()
+                .queryResultsReader(instance.queryResultsReader().withFileReadThreads(2))
+                .build();
+
+        // When / Then
+        assertThatThrownBy(() -> client.getQueryResults("query-table", "test-query"))
+                .isInstanceOf(QueryResultsNotFoundException.class)
+                .hasMessageContaining("test-query");
+    }
+
+    @Test
+    void shouldGetEmptyResultsOfQueryThatMatchedNoRows() throws Exception {
+        // Given a query that was processed but matched no rows
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.setQueryResults("test-query", List.of());
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = sleeperClient.getQueryResults(query)) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then
+        assertThat(rows).isEmpty();
+    }
+
+    @Test
+    void shouldTimeOutWaitingForQueryThatDoesNotFinish() {
+        // Given
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryInProgress(query);
+        PollWithRetries poll = PollWithRetries.builder()
+                .pollIntervalMillis(10).maxRetries(1)
+                .sleepInInterval(ThreadSleepTestHelper.noWaits())
+                .build();
+
+        // When / Then
+        assertThatThrownBy(() -> sleeperClient.waitForQuery("test-query", poll))
+                .isInstanceOf(PollWithRetries.TimedOutException.class);
+    }
+
+    @Test
+    void shouldStreamResultsOfSubQueriesAsTheyFinish() throws Exception {
+        // Given a query where one subquery has already published its results, and a second subquery publishes its
+        // results and the query completes during the first wait for more results
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryInProgress(query);
+        instance.publishQueryResultsFile("test-query", "file-1.parquet", List.of(new Row(Map.of("key", "A"))));
+        List<Row> rows = new ArrayList<>();
+        List<Integer> rowsReadBeforeEachWait = new ArrayList<>();
+        PollWithRetries poll = PollWithRetries.builder()
+                .pollIntervalMillis(10).maxRetries(10)
+                .sleepInInterval(ThreadSleepTestHelper.withActionAfterWait(
+                        millis -> rowsReadBeforeEachWait.add(rows.size()),
+                        () -> {
+                            instance.publishQueryResultsFile("test-query", "file-2.parquet", List.of(new Row(Map.of("key", "B"))));
+                            instance.queryTracker().queryCompleted(query, new ResultsOutputInfo(2L, List.of()));
+                        }))
+                .build();
+
+        // When
+        try (CloseableIterator<Row> iterator = sleeperClient.submitQueryAndStreamResults(query, poll)) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then the query was submitted, and the first file was read before the query finished
+        assertThat(instance.queryQueue()).containsExactly(query);
+        assertThat(rows).containsExactly(
+                new Row(Map.of("key", "A")),
+                new Row(Map.of("key", "B")));
+        assertThat(rowsReadBeforeEachWait).containsExactly(1);
+    }
+
+    @Test
+    void shouldStreamResultsOfSubQueriesAsTheyFinishReadingFilesInParallel() throws Exception {
+        // Given a client configured to read results files in parallel, a query where one subquery has already
+        // published its results, and a second subquery publishes its results and the query completes during the first
+        // wait for more results
+        SleeperClient client = instance.sleeperClientBuilder()
+                .queryResultsReader(instance.queryResultsReader().withFileReadThreads(2))
+                .build();
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryInProgress(query);
+        instance.publishQueryResultsFile("test-query", "file-1.parquet", List.of(new Row(Map.of("key", "A"))));
+        List<Row> rows = new ArrayList<>();
+        List<Integer> rowsReadBeforeEachWait = new ArrayList<>();
+        PollWithRetries poll = PollWithRetries.builder()
+                .pollIntervalMillis(10).maxRetries(10)
+                .sleepInInterval(ThreadSleepTestHelper.withActionAfterWait(
+                        millis -> rowsReadBeforeEachWait.add(rows.size()),
+                        () -> {
+                            instance.publishQueryResultsFile("test-query", "file-2.parquet", List.of(new Row(Map.of("key", "B"))));
+                            instance.queryTracker().queryCompleted(query, new ResultsOutputInfo(2L, List.of()));
+                        }))
+                .build();
+
+        // When
+        try (CloseableIterator<Row> iterator = client.submitQueryAndStreamResults(query, poll)) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then the query was submitted, and the first file was read before the query finished
+        assertThat(instance.queryQueue()).containsExactly(query);
+        assertThat(rows).containsExactly(
+                new Row(Map.of("key", "A")),
+                new Row(Map.of("key", "B")));
+        assertThat(rowsReadBeforeEachWait).containsExactly(1);
+    }
+
+    @Test
+    void shouldFailStreamingResultsInParallelWhenQueryFails() throws Exception {
+        // Given a client configured to read results files in parallel, a query where one subquery has already
+        // published its results, and the query fails during the first wait for more results
+        SleeperClient client = instance.sleeperClientBuilder()
+                .queryResultsReader(instance.queryResultsReader().withFileReadThreads(2))
+                .build();
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryInProgress(query);
+        instance.publishQueryResultsFile("test-query", "file-1.parquet", List.of(new Row(Map.of("key", "A"))));
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollWithWaitAction(foundWaits,
+                () -> instance.queryTracker().queryFailed(query, new Exception("Query failed")));
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = client.submitQueryAndStreamResults(query, poll)) {
+            assertThatThrownBy(() -> iterator.forEachRemaining(rows::add))
+                    .isInstanceOf(QueryFailedException.class)
+                    .hasMessageContaining("test-query")
+                    .hasMessageContaining("FAILED");
+        }
+
+        // Then the rows read before the failure are a partial result
+        assertThat(rows).containsExactly(new Row(Map.of("key", "A")));
+    }
+
+    @Test
+    void shouldStreamNoResultsInParallelWhenQueryCompletesWithNoRows() throws Exception {
+        // Given a client configured to read results files in parallel, and a query that completes with no rows before
+        // any results are read
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryCompleted(query, new ResultsOutputInfo(0L, List.of()));
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollRecordingWaits(foundWaits);
+        List<String> listedQueryIds = new ArrayList<>();
+        QueryResultsReader resultsReader = (tableName, queryId) -> {
+            listedQueryIds.add(queryId);
+            return List.of();
+        };
+        SleeperClient client = instance.sleeperClientBuilder()
+                .queryResultsReader(resultsReader.withFileReadThreads(2))
+                .build();
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = client.submitQueryAndStreamResults(query, poll)) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then no results were read, without waiting or listing the results output
+        assertThat(rows).isEmpty();
+        assertThat(foundWaits).isEmpty();
+        assertThat(listedQueryIds).isEmpty();
+    }
+
+    @Test
+    void shouldFailStreamingResultsWhenQueryFailsAfterSomeResultsWereRead() throws Exception {
+        // Given a query where one subquery has already published its results, and the query fails during the first
+        // wait for more results
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryInProgress(query);
+        instance.publishQueryResultsFile("test-query", "file-1.parquet", List.of(new Row(Map.of("key", "A"))));
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollWithWaitAction(foundWaits,
+                () -> instance.queryTracker().queryFailed(query, new Exception("Query failed")));
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = sleeperClient.submitQueryAndStreamResults(query, poll)) {
+            assertThatThrownBy(() -> iterator.forEachRemaining(rows::add))
+                    .isInstanceOf(QueryFailedException.class)
+                    .hasMessageContaining("test-query")
+                    .hasMessageContaining("FAILED");
+        }
+
+        // Then the rows read before the failure are a partial result
+        assertThat(rows).containsExactly(new Row(Map.of("key", "A")));
+    }
+
+    @Test
+    void shouldStreamNoResultsWhenQueryCompletesWithNoResultsFiles() throws Exception {
+        // Given a query that completes with no rows before any results are read
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryCompleted(query, new ResultsOutputInfo(0L, List.of()));
+        List<Duration> foundWaits = new ArrayList<>();
+        PollWithRetries poll = pollRecordingWaits(foundWaits);
+        List<String> listedQueryIds = new ArrayList<>();
+        SleeperClient client = instance.sleeperClientBuilder()
+                .queryResultsReader((tableName, queryId) -> {
+                    listedQueryIds.add(queryId);
+                    return List.of();
+                })
+                .build();
+
+        // When
+        List<Row> rows = new ArrayList<>();
+        try (CloseableIterator<Row> iterator = client.submitQueryAndStreamResults(query, poll)) {
+            iterator.forEachRemaining(rows::add);
+        }
+
+        // Then no results were read, without waiting or listing the results output
+        assertThat(rows).isEmpty();
+        assertThat(foundWaits).isEmpty();
+        assertThat(listedQueryIds).isEmpty();
+    }
+
+    @Test
+    void shouldRefuseStreamingResultsForQueryThatPublishesResultsSomewhereOtherThanS3() {
+        // Given
+        Query query = exactQuery("test-query", "A", "query-table")
+                .withResultsPublisherConfig(Map.of(ResultsOutput.DESTINATION, SQSResultsOutput.SQS));
+
+        // When / Then
+        assertThatThrownBy(() -> sleeperClient.submitQueryAndStreamResults(query))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Query results will not be published to S3");
+        assertThat(instance.queryQueue()).isEmpty();
+    }
+
+    @Test
+    void shouldTimeOutStreamingResultsWhenNoNewResultsArePublished() throws Exception {
+        // Given a query that stays in progress and never publishes more results
+        Query query = exactQuery("test-query", "A", "query-table");
+        instance.queryTracker().queryInProgress(query);
+        PollWithRetries poll = PollWithRetries.builder()
+                .pollIntervalMillis(10).maxRetries(1)
+                .sleepInInterval(ThreadSleepTestHelper.noWaits())
+                .build();
+
+        // When / Then
+        try (CloseableIterator<Row> iterator = sleeperClient.submitQueryAndStreamResults(query, poll)) {
+            assertThatThrownBy(iterator::hasNext)
+                    .isInstanceOf(PollWithRetries.TimedOutException.class);
+        }
+    }
+
+    private PollWithRetries pollRecordingWaits(List<Duration> foundWaits) {
+        return PollWithRetries.builder()
+                .pollIntervalMillis(10).maxRetries(10)
+                .sleepInInterval(ThreadSleepTestHelper.recordWaits(foundWaits))
+                .build();
+    }
+
+    private PollWithRetries pollWithWaitAction(List<Duration> foundWaits, ThreadSleepTestHelper.WaitAction action) {
+        return PollWithRetries.builder()
+                .pollIntervalMillis(10).maxRetries(10)
+                .sleepInInterval(ThreadSleepTestHelper.withActionAfterWait(
+                        ThreadSleepTestHelper.recordWaits(foundWaits), action))
+                .build();
     }
 
     @Test

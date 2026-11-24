@@ -21,8 +21,9 @@ import sleeper.core.properties.instance.InstanceProperties;
 import sleeper.core.properties.table.TableProperties;
 import sleeper.core.properties.table.TablePropertiesProvider;
 import sleeper.core.properties.testutils.FixedTablePropertiesProvider;
+import sleeper.core.util.ExponentialBackoffWithJitter;
 import sleeper.ingest.batcher.core.IngestBatcherStore;
-import sleeper.localstack.test.LocalStackTestBase;
+import sleeper.local.aws.test.LocalAwsTestBase;
 
 import java.util.List;
 
@@ -31,8 +32,10 @@ import static sleeper.core.properties.table.TableProperty.TABLE_ID;
 import static sleeper.core.properties.testutils.InstancePropertiesTestHelper.createTestInstanceProperties;
 import static sleeper.core.properties.testutils.TablePropertiesTestHelper.createTestTableProperties;
 import static sleeper.core.schema.SchemaTestHelper.createSchemaWithKey;
+import static sleeper.core.testutils.JitterTestHelper.noJitter;
+import static sleeper.core.util.ThreadSleepTestHelper.noWaits;
 
-public class DynamoDBIngestBatcherStoreTestBase extends LocalStackTestBase {
+public class DynamoDBIngestBatcherStoreTestBase extends LocalAwsTestBase {
     protected final InstanceProperties instanceProperties = createTestInstanceProperties();
     protected final TableProperties table1 = createTestTableProperties(instanceProperties, createSchemaWithKey("key"));
     protected final TableProperties table2 = createTestTableProperties(instanceProperties, createSchemaWithKey("key"));
@@ -51,6 +54,7 @@ public class DynamoDBIngestBatcherStoreTestBase extends LocalStackTestBase {
     }
 
     protected IngestBatcherStore storeWithFilesInAssignJobBatch(int filesInAssignJobBatch) {
-        return new DynamoDBIngestBatcherStore(dynamoClient, instanceProperties, tablePropertiesProvider, filesInAssignJobBatch);
+        return new DynamoDBIngestBatcherStore(dynamoClient, instanceProperties, tablePropertiesProvider, filesInAssignJobBatch,
+                new ExponentialBackoffWithJitter(DynamoDBIngestBatcherStore.UNPROCESSED_WRITES_WAIT_RANGE, noJitter(), noWaits()));
     }
 }

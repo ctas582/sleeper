@@ -21,6 +21,8 @@ import sleeper.core.properties.SleeperPropertiesPrettyPrinter;
 import sleeper.core.properties.SleeperPropertiesPrettyPrinter.Builder;
 import sleeper.core.properties.SleeperPropertiesValidationCriteria;
 import sleeper.core.properties.SleeperPropertyIndex;
+import sleeper.core.properties.model.CompactionProgressCheckSettings;
+import sleeper.core.properties.model.EmrServerlessDynamicAllocationBounds;
 import sleeper.core.properties.model.PersistentEMRManagedScalingBounds;
 
 import java.io.IOException;
@@ -80,7 +82,10 @@ public class InstanceProperties extends SleeperProperties<InstanceProperty> {
 
     @Override
     protected List<SleeperPropertiesValidationCriteria<InstanceProperty>> getValidationCriteria() {
-        return List.of(PersistentEMRManagedScalingBounds.validationCriteria());
+        return List.of(
+                PersistentEMRManagedScalingBounds.validationCriteria(),
+                CompactionProgressCheckSettings.validationCriteria(),
+                EmrServerlessDynamicAllocationBounds.instanceDefaultsValidationCriteria());
     }
 
     /**

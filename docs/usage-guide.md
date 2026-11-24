@@ -7,9 +7,6 @@ This will assume you have a deployed instance of Sleeper, and you've installed o
 described in the [getting started guide](getting-started.md). See the [deployment guide](deployment-guide.md) for more
 information on deploying an instance.
 
-If you just want to test locally, see the documentation on [deploying to localstack](deployment/deploy-to-localstack.md).
-This has very limited functionality compared to a deployed instance.
-
 ## Configuration
 
 Details of all Sleeper configuration properties are available here: [Properties](usage/property-master.md). These can be
@@ -36,8 +33,8 @@ In the future it will be possible to export Sleeper table data in bulk. See the 
 
 ## Clients and scripts
 
-There are clients and scripts in the `scripts/deploy`, `scripts/report`, `scripts/table` and `scripts/utility`
-directories that can be used to work with an existing instance.
+There are clients and scripts in the `scripts/deploy`, `scripts/maintenance`, `scripts/report`, `scripts/table` and
+`scripts/utility` directories that can be used to work with an existing instance.
 
 Also see the [tables documentation](usage/tables.md#add-edit-a-table) for scripts to add/edit Sleeper tables.
 
@@ -68,6 +65,17 @@ skipped by the compaction strategy:
 
 ```bash
 ./scripts/utility/compactAllFiles.sh ${INSTANCE_ID} <table-name-1> <table-name-2> ...
+```
+
+### Requeue compaction jobs from the state store
+
+This is a maintenance script to be used in the scenario that there are compaction jobs assigned to files in the state
+store but for some reason all attempts at executing those compactions failed. The following script can be used to
+recreate every compaction job that files in the table are assigned to, and send those jobs back to the compaction
+job queue:
+
+```bash
+./scripts/maintenance/requeueCompactionJobsFromStateStore.sh ${INSTANCE_ID} <table-name>
 ```
 
 ## Java API

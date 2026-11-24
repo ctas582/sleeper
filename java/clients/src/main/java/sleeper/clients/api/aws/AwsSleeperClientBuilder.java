@@ -21,6 +21,7 @@ import sleeper.clients.api.BulkExportQuerySender;
 import sleeper.clients.api.BulkImportJobSender;
 import sleeper.clients.api.IngestBatcherSender;
 import sleeper.clients.api.IngestJobSender;
+import sleeper.clients.api.QuerySender;
 import sleeper.clients.api.QueryWebSocketSender;
 import sleeper.clients.api.SleeperClient;
 import sleeper.clients.util.ShutdownWrapper;
@@ -36,6 +37,8 @@ import sleeper.core.table.TableIndex;
 import sleeper.core.util.ObjectFactory;
 import sleeper.parquet.utils.TableHadoopConfigurationProvider;
 import sleeper.query.core.rowretrieval.LeafPartitionRowRetrieverProvider;
+import sleeper.query.runner.results.QueryResultsReader;
+import sleeper.query.runner.tracker.DynamoDBQueryTracker;
 import sleeper.statestore.StateStoreFactory;
 
 import java.util.List;
@@ -53,6 +56,7 @@ public class AwsSleeperClientBuilder {
     private SleeperClientHadoopProvider hadoopProvider = SleeperClientHadoopProvider.getDefault();
     private SleeperClientQueryProvider queryProvider;
     private Integer queryThreadPoolSize;
+    private int queryResultsFileReadThreads = 1;
 
     /**
      * Creates a Sleeper client.
@@ -83,6 +87,10 @@ public class AwsSleeperClientBuilder {
                 .bulkExportQuerySender(BulkExportQuerySender.toSqs(instanceProperties, awsClients.sqs()))
                 .queryWebSocketSender(QueryWebSocketSender.query(instanceProperties, tablePropertiesProvider,
                         awsClients.awsCredentialsProvider()))
+                .querySender(QuerySender.toSqs(instanceProperties, tablePropertiesProvider, awsClients.sqs()))
+                .queryResultsReader(QueryResultsReader.fromS3(instanceProperties, tablePropertiesProvider, hadoop)
+                        .withFileReadThreads(queryResultsFileReadThreads))
+                .queryTrackerStore(new DynamoDBQueryTracker(instanceProperties, awsClients.dynamo()))
                 .shutdown(new UncheckedAutoCloseables(List.of(awsClients, rowRetrieverProvider)))
                 .build();
     }
@@ -138,6 +146,19 @@ public class AwsSleeperClientBuilder {
      */
     public AwsSleeperClientBuilder queryThreadPoolSize(int queryThreadPoolSize) {
         this.queryThreadPoolSize = queryThreadPoolSize;
+        return this;
+    }
+
+    /**
+     * Sets the number of threads used to read query results files. With more than one thread, the files are read in
+     * parallel and the rows are interleaved across files in no particular order. Defaults to 1, where the files are
+     * read one at a time.
+     *
+     * @param  queryResultsFileReadThreads the number of threads
+     * @return                             this builder
+     */
+    public AwsSleeperClientBuilder queryResultsFileReadThreads(int queryResultsFileReadThreads) {
+        this.queryResultsFileReadThreads = queryResultsFileReadThreads;
         return this;
     }
 

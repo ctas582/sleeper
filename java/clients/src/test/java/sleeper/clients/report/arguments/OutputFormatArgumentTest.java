@@ -1,0 +1,87 @@
+/*
+ * Copyright 2022-2026 Crown Copyright
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package sleeper.clients.report.arguments;
+
+import org.junit.jupiter.api.Test;
+
+import sleeper.core.util.cli.CommandArgumentReader;
+import sleeper.core.util.cli.CommandArguments;
+import sleeper.core.util.cli.CommandArgumentsException;
+import sleeper.core.util.cli.CommandLineUsage;
+import sleeper.core.util.cli.CommandOption;
+
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+public class OutputFormatArgumentTest {
+
+    private final OutputFormatArgument<String> reportType = OutputFormatArgument
+            .withDefault("STANDARD", "standard-reporter")
+            .addReporter("JSON", "json-reporter")
+            .addReporter("CSV", "csv-reporter")
+            .build();
+
+    private final CommandLineUsage usage = CommandLineUsage.builder()
+            .positionalArguments(List.of("instance-id"))
+            .options(List.of(reportType.option()))
+            .build();
+
+    @Test
+    void shouldReadDefaultReporterWhenOptionNotSet() {
+        // When / Then
+        assertThat(read("my-instance")).isEqualTo("standard-reporter");
+    }
+
+    @Test
+    void shouldReadReporterWhenOptionSet() {
+        // When / Then
+        assertThat(read("my-instance", "--format", "JSON")).isEqualTo("json-reporter");
+    }
+
+    @Test
+    void shouldReadReporterIgnoringCase() {
+        // When / Then
+        assertThat(read("my-instance", "--format", "json")).isEqualTo("json-reporter");
+    }
+
+    @Test
+    void shouldFailWhenReportTypeIsNotSupported() {
+        // When / Then
+        assertThatThrownBy(() -> read("my-instance", "--format", "xml"))
+                .isInstanceOf(CommandArgumentsException.class)
+                .hasMessage("Output format not supported: xml. Valid formats: CSV, JSON, STANDARD");
+    }
+
+    @Test
+    void shouldDeclareOptionWithSharedName() {
+        // When
+        CommandOption option = reportType.option();
+
+        // Then
+        assertThat(option.longName()).isEqualTo("format");
+        assertThat(option.shortName()).isEmpty();
+        assertThat(option.isFlag()).isFalse();
+        assertThat(option.helpText()).get().isEqualTo("Output format. One of CSV, JSON, STANDARD. Defaults to STANDARD.");
+        assertThat(option.argsHelpText()).get().isEqualTo("<format>");
+    }
+
+    private String read(String... args) {
+        CommandArguments arguments = CommandArgumentReader.parse(usage, args);
+        return reportType.read(arguments);
+    }
+}
