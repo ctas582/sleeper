@@ -77,7 +77,8 @@ public interface ApiProperty {
     UserDefinedInstanceProperty API_CORS_ALLOWED_ORIGINS = Index.propertyBuilder("sleeper.rest.api.cors.allowed.origins")
             .description("A list of origins the API will accept browser requests from. This is empty by default, which means no cross-origin requests are allowed.")
             .propertyGroup(InstancePropertyGroup.API)
-            .ignoreEmptyValue(false).build();
+            .ignoreEmptyValue(false)
+            .runCdkDeployWhenChanged(true).build();
     UserDefinedInstanceProperty API_LAMBDA_MEMORY_IN_MB = Index.propertyBuilder("sleeper.rest.api.lambda.memory.mb")
             .description("The amount of memory in MB for the lambda function that serves the API.")
             .defaultValue("1024")

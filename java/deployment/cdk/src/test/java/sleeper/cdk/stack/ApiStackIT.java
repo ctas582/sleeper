@@ -24,6 +24,7 @@ import sleeper.cdk.testutil.SleeperStackTestBase;
 import static org.assertj.core.api.Assertions.assertThat;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_COGNITO_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_IAM_ENABLED;
+import static sleeper.core.properties.instance.ApiProperty.API_CORS_ALLOWED_ORIGINS;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_CLIENT_ID;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_ISSUER;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_LOGIN_URL;
@@ -165,6 +166,32 @@ public class ApiStackIT extends SleeperStackTestBase {
         assertThat(start).isNotNegative();
         int end = template.indexOf("\"Type\": \"AWS::", start + 1);
         return end < 0 ? template.substring(start) : template.substring(start, end);
+    }
+
+    @Test
+    void shouldTellTheApiWhichWebsitesABrowserMayCallItFrom() {
+        // Given
+        instanceProperties.set(API_CORS_ALLOWED_ORIGINS, "https://sleeper.example.com,http://localhost:5173");
+        SleeperCoreStacks core = SleeperCoreStacks.create(rootStack, instanceProps());
+
+        // When
+        ApiStack stack = new ApiStack(rootStack, "Api", instanceProps(), core);
+
+        // Then
+        assertThat(printer.toJson(stack))
+                .contains("\"QUARKUS_HTTP_CORS_ORIGINS\": \"https://sleeper.example.com,http://localhost:5173\"");
+    }
+
+    @Test
+    void shouldAllowNoOtherWebsiteToCallTheApiByDefault() {
+        // Given
+        SleeperCoreStacks core = SleeperCoreStacks.create(rootStack, instanceProps());
+
+        // When
+        ApiStack stack = new ApiStack(rootStack, "Api", instanceProps(), core);
+
+        // Then
+        assertThat(printer.toJson(stack)).doesNotContain("QUARKUS_HTTP_CORS_ORIGINS");
     }
 
     @Test

@@ -98,6 +98,43 @@ class UserInterfaceTest {
     }
 
     @Nested
+    @DisplayName("Serve the interface to a browser reaching the server through API Gateway")
+    class ServeThroughApiGateway {
+
+        // API Gateway terminates the browser's HTTPS connection and invokes the lambda with the request as an
+        // event. Quarkus replays that event to itself over an internal connection with no TLS. If the X-Forwarded-*
+        // headers added by API Gateway aren't trusted then then CORS filter would reject the requests for any
+        // UI assets (e.g. JavaScript, CSS).
+        private static final String HOST = "abc123.execute-api.eu-west-2.amazonaws.com";
+        private static final String ORIGIN = "https://" + HOST;
+
+        @ParameterizedTest
+        @ValueSource(strings = {"/", "/index.html", "/q/health"})
+        void shouldAllowARequestFromTheSameWebsite(String path) {
+            given()
+                    .header("Host", HOST)
+                    .header("X-Forwarded-Proto", "https")
+                    .header("X-Forwarded-Port", "443")
+                    .header("Origin", ORIGIN)
+                    .when().get(path)
+                    .then()
+                    .statusCode(200);
+        }
+
+        @Test
+        void shouldStillRefuseARequestFromAnotherWebsite() {
+            given()
+                    .header("Host", HOST)
+                    .header("X-Forwarded-Proto", "https")
+                    .header("X-Forwarded-Port", "443")
+                    .header("Origin", "https://somewhere.else")
+                    .when().get("/")
+                    .then()
+                    .statusCode(403);
+        }
+    }
+
+    @Nested
     @DisplayName("Refuse everything else to a client who has not signed in")
     class RefuseEverythingElse {
 

@@ -51,9 +51,11 @@ import sleeper.core.properties.instance.InstanceProperties;
 import sleeper.core.util.EnvironmentUtils;
 
 import java.util.List;
+import java.util.Map;
 
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_COGNITO_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_IAM_ENABLED;
+import static sleeper.core.properties.instance.ApiProperty.API_CORS_ALLOWED_ORIGINS;
 import static sleeper.core.properties.instance.ApiProperty.API_LAMBDA_MEMORY_IN_MB;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_CLIENT_ID;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_ISSUER;
@@ -80,7 +82,7 @@ public class ApiStack extends NestedStack {
         IFunction lambda = lambdaCode.buildFunction(LambdaHandler.API_HANDLER, "ApiHandlerLambda", builder -> builder
                 .functionName(functionName)
                 .description("Serves the Sleeper REST API")
-                .environment(EnvironmentUtils.createDefaultEnvironment(instanceProperties))
+                .environment(environment(instanceProperties))
                 .memorySize(instanceProperties.getInt(API_LAMBDA_MEMORY_IN_MB))
                 .logGroup(coreStacks.getLogGroup(LogGroupRef.API_HANDLER))
                 .timeout(TIMEOUT));
@@ -156,6 +158,15 @@ public class ApiStack extends NestedStack {
         new CfnOutput(this, "ApiCognitoLoginUrl", CfnOutputProps.builder()
                 .value(domain.baseUrl())
                 .build());
+    }
+
+    private static Map<String, String> environment(InstanceProperties instanceProperties) {
+        Map<String, String> environment = EnvironmentUtils.createDefaultEnvironment(instanceProperties);
+        List<String> origins = instanceProperties.getList(API_CORS_ALLOWED_ORIGINS);
+        if (!origins.isEmpty()) {
+            environment.put("QUARKUS_HTTP_CORS_ORIGINS", String.join(",", origins));
+        }
+        return environment;
     }
 
     private List<HttpRoute> addProxyRoutes(HttpApi api, IFunction lambda, String integrationName) {
