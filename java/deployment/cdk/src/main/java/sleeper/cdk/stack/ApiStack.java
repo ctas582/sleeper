@@ -61,7 +61,7 @@ import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_A
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_ISSUER;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_LOGIN_URL;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_IAM_URL;
-import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_URL;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_TOKEN_URL;
 
 /**
  * The REST API for a Sleeper instance, and the UI it serves.
@@ -94,7 +94,7 @@ public class ApiStack extends NestedStack {
                 .apiName(functionName)
                 .build();
         addProxyRoutes(tokenApi, lambda, instanceId);
-        instanceProperties.set(REST_API_URL, tokenApi.getApiEndpoint());
+        instanceProperties.set(REST_API_TOKEN_URL, tokenApi.getApiEndpoint());
         new CfnOutput(this, "ApiUrl", CfnOutputProps.builder()
                 .value(tokenApi.getApiEndpoint())
                 .build());

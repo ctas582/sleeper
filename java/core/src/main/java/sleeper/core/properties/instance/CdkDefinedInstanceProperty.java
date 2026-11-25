@@ -811,6 +811,11 @@ public interface CdkDefinedInstanceProperty extends InstanceProperty {
             .description("The URL for the Sleeper REST API.")
             .propertyGroup(InstancePropertyGroup.API)
             .build();
+    CdkDefinedInstanceProperty REST_API_TOKEN_URL = Index.propertyBuilder("sleeper.rest.api.token.url")
+            .description("The URL of the API endpoint that authenticates callers by a token from an OIDC issuer, " +
+                    "which also serves the UI.")
+            .propertyGroup(InstancePropertyGroup.API)
+            .build();
     CdkDefinedInstanceProperty REST_API_IAM_URL = Index.propertyBuilder("sleeper.rest.api.iam.url")
             .description("The URL of the API endpoint that authenticates callers by their IAM role.")
             .propertyGroup(InstancePropertyGroup.API)

@@ -29,7 +29,7 @@ import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_A
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_ISSUER;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_LOGIN_URL;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_IAM_URL;
-import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_URL;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_TOKEN_URL;
 import static sleeper.core.properties.instance.CommonProperty.RETAIN_INFRA_AFTER_DESTROY;
 
 public class ApiStackIT extends SleeperStackTestBase {
@@ -203,7 +203,7 @@ public class ApiStackIT extends SleeperStackTestBase {
         new ApiStack(rootStack, "Api", instanceProps(), core);
 
         // Then
-        assertThat(instanceProperties.get(REST_API_URL)).isNotNull();
+        assertThat(instanceProperties.get(REST_API_TOKEN_URL)).isNotNull();
         assertThat(instanceProperties.get(REST_API_IAM_URL)).isNotNull();
     }
 
@@ -217,7 +217,7 @@ public class ApiStackIT extends SleeperStackTestBase {
         new ApiStack(rootStack, "Api", instanceProps(), core);
 
         // Then
-        assertThat(instanceProperties.get(REST_API_URL)).isNotNull();
+        assertThat(instanceProperties.get(REST_API_TOKEN_URL)).isNotNull();
         assertThat(instanceProperties.get(REST_API_IAM_URL)).isNull();
     }
 
