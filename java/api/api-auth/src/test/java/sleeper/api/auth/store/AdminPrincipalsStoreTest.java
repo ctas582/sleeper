@@ -18,6 +18,7 @@ package sleeper.api.auth.store;
 import org.junit.jupiter.api.Test;
 
 import sleeper.api.auth.PrincipalId;
+import sleeper.api.auth.iam.IamPrincipalMapper;
 import sleeper.core.properties.instance.InstanceProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -41,6 +42,16 @@ public class AdminPrincipalsStoreTest {
         properties.set(API_AUTH_ADMIN_PRINCIPALS, "iam#" + ROLE_ARN);
 
         assertThat(store().permissionsFor(PrincipalId.forIamRole(ROLE_ARN)).isAdmin()).isTrue();
+    }
+
+    @Test
+    void shouldMakeAListedRoleWithAPathAnAdministratorWhenCallingAsASessionOfThatRole() {
+        properties.set(API_AUTH_ADMIN_PRINCIPALS,
+                "iam#arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/eu-west-2/AWSReservedSSO_Admin_abc");
+
+        PrincipalId caller = IamPrincipalMapper.principalFor(
+                "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_Admin_abc/[EMAIL_REDACTED]").orElseThrow();
+        assertThat(store().permissionsFor(caller).isAdmin()).isTrue();
     }
 
     @Test

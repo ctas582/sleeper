@@ -15,6 +15,8 @@
  */
 package sleeper.api.auth;
 
+import sleeper.api.auth.iam.IamPrincipalMapper;
+
 import java.util.Objects;
 
 /**
@@ -64,7 +66,8 @@ public class PrincipalId {
      *
      * @param  id                       the identifier
      * @return                          the identifier
-     * @throws IllegalArgumentException if it does not say how the client authenticates
+     * @throws IllegalArgumentException if it does not say how the client authenticates, or if it is an ARN that
+     *                                  a caller could not be identified by
      */
     public static PrincipalId parse(String id) {
         requireSet(id, "principal");
@@ -74,6 +77,12 @@ public class PrincipalId {
         }
         PrincipalType type = PrincipalType.fromPrefix(id.substring(0, separator))
                 .orElseThrow(() -> new IllegalArgumentException(unreadable(id)));
+        if (type == PrincipalType.IAM) {
+            return IamPrincipalMapper.principalFor(id.substring(separator + 1))
+                    .orElseThrow(() -> new IllegalArgumentException("Could not read the ARN in the principal \"" + id +
+                            "\". Expected the ARN of an IAM role or user, such as " +
+                            "iam#arn:aws:iam::123456789012:role/name."));
+        }
         return new PrincipalId(type, id);
     }
 

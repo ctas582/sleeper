@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import sleeper.api.auth.iam.IamPrincipalMapper;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -46,8 +48,28 @@ public class PrincipalIdTest {
         }
 
         @Test
+        void shouldMatchARoleWrittenWithItsPath() {
+            assertThat(PrincipalId.parse("iam#arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/eu-west-2/AWSReservedSSO_Admin_abc"))
+                    .isEqualTo(IamPrincipalMapper.principalFor(
+                            "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_Admin_abc/someone@example.com").orElseThrow());
+        }
+
+        @Test
+        void shouldMatchARoleWrittenAsASessionOfThatRole() {
+            assertThat(PrincipalId.parse("iam#arn:aws:sts::123456789012:assumed-role/SleeperAdmin/some-session"))
+                    .isEqualTo(PrincipalId.forIamRole(ROLE_ARN));
+        }
+
+        @Test
         void shouldReadBackAPrincipalItWrote() {
             PrincipalId principal = PrincipalId.forToken(ISSUER, "a1b2c3");
+
+            assertThat(PrincipalId.parse(principal.toString())).isEqualTo(principal);
+        }
+
+        @Test
+        void shouldReadBackARoleItWrote() {
+            PrincipalId principal = PrincipalId.forIamRole(ROLE_ARN);
 
             assertThat(PrincipalId.parse(principal.toString())).isEqualTo(principal);
         }
@@ -106,6 +128,17 @@ public class PrincipalIdTest {
         void shouldRefuseAPrincipalThatDoesNotSayHowTheClientAuthenticates(String principal) {
             assertThatThrownBy(() -> PrincipalId.parse(principal))
                     .isInstanceOf(IllegalArgumentException.class);
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {
+            "iam#SleeperAdmin",
+            "iam#arn:aws:s3:::some-bucket",
+            "iam#arn:aws:iam::123456789012:role/"})
+        void shouldRefuseARoleWithAnArnNoCallerCouldBeIdentifiedBy(String principal) {
+            assertThatThrownBy(() -> PrincipalId.parse(principal))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining(principal);
         }
 
         @Test
