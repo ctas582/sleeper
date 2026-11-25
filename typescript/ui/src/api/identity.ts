@@ -16,6 +16,7 @@
 
 export interface GrantedPermission {
 	permission: string
+	allTables?: boolean
 	tables?: string[]
 }
 

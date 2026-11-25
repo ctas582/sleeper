@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import type { ClientIdentity } from '../api/identity'
+import type { ClientIdentity, GrantedPermission } from '../api/identity'
 import { fetchIdentity } from '../api/identity'
 import './WhoAmI.css'
 
@@ -69,9 +69,9 @@ export function WhoAmI({ idToken, onSignOut }: Props) {
 			{identity.permissions.length > 0 ? (
 				<ul className="who-am-i__permissions">
 					{identity.permissions.map(granted => (
-						<li key={granted.permission}>
+						<li key={keyOf(granted)}>
 							{granted.permission}
-							{granted.tables?.length ? ` on ${granted.tables.join(', ')}` : ' on every table'}
+							{describeScope(granted)}
 						</li>
 					))}
 				</ul>
@@ -84,4 +84,25 @@ export function WhoAmI({ idToken, onSignOut }: Props) {
 			<button onClick={onSignOut}>Sign out</button>
 		</div>
 	)
+}
+
+function describeScope(granted: GrantedPermission): string {
+	if (granted.tables?.length) {
+		return ` on ${granted.tables.join(', ')}`
+	}
+	if (granted.allTables) {
+		return ' on every table'
+	}
+	return ''
+}
+
+// The same permission can be granted more than once over different tables, so the scope is part of what identifies it
+function keyOf(granted: GrantedPermission): string {
+	if (granted.tables?.length) {
+		return `${granted.permission}:${granted.tables.join(',')}`
+	}
+	if (granted.allTables) {
+		return `${granted.permission}:*`
+	}
+	return granted.permission
 }
