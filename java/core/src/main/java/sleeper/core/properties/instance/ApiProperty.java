@@ -46,6 +46,10 @@ public interface ApiProperty {
                     "Configuring an issuer lets its users authenticate. It does not give them any access. Permissions " +
                     "come only from the principal allow-list.\n" +
                     "\n" +
+                    "The name \"AWS Cognito\" is reserved for the Cognito user pool Sleeper can create, set by " +
+                    "sleeper.rest.api.auth.cognito.enabled. An issuer with the same issuer identifier as that user " +
+                    "pool replaces how its tokens are verified, including the built-in requirement for ID tokens.\n" +
+                    "\n" +
                     "Set this on a single line. A backslash starts an escape sequence in a properties file, so avoid " +
                     "a key format that contains one.")
             .validationPredicate(SleeperPropertyValueUtils::isValidOidcIssuers)

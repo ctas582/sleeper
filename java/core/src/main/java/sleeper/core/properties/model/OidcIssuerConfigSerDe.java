@@ -54,6 +54,10 @@ public class OidcIssuerConfigSerDe {
         Set<String> issuerIds = new LinkedHashSet<>();
         for (JsonElement element : array) {
             OidcIssuerConfig issuer = readIssuer(element);
+            if (issuer.name().strip().equalsIgnoreCase(OidcIssuerConfig.COGNITO_ISSUER_NAME)) {
+                throw new IllegalArgumentException("OIDC issuers cannot be named \"" + issuer.name() + "\", as the name \"" +
+                        OidcIssuerConfig.COGNITO_ISSUER_NAME + "\" is reserved for the Cognito user pool Sleeper can create.");
+            }
             if (!names.add(issuer.name())) {
                 throw new IllegalArgumentException("OIDC issuers must each have a unique name, found more than one named \"" + issuer.name() + "\".");
             }

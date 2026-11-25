@@ -61,6 +61,10 @@ public record OidcIssuerConfig(
         int clockSkewSeconds,
         Map<String, String> requiredClaims) {
 
+    /**
+     * The name of the issuer for the Cognito user pool Sleeper can create for an instance. This is reserved.
+     */
+    public static final String COGNITO_ISSUER_NAME = "AWS Cognito";
     public static final String DEFAULT_PRINCIPAL_CLAIM = "sub";
     public static final int DEFAULT_CLOCK_SKEW_SECONDS = 60;
     public static final int MAX_CLOCK_SKEW_SECONDS = 300;

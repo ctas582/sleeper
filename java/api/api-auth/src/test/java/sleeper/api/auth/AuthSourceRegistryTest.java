@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_COGNITO_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_IAM_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_OIDC_ISSUERS;
@@ -148,7 +149,7 @@ public class AuthSourceRegistryTest {
 
             assertThat(registry().forIssuer(POOL_ISSUER))
                     .map(OidcIssuerConfig::name)
-                    .contains(AuthSourceRegistry.COGNITO_ISSUER_NAME);
+                    .contains(OidcIssuerConfig.COGNITO_ISSUER_NAME);
         }
 
         @Test
@@ -212,7 +213,20 @@ public class AuthSourceRegistryTest {
 
             assertThat(registry().issuers())
                     .extracting(OidcIssuerConfig::name)
-                    .containsExactly("corp", AuthSourceRegistry.COGNITO_ISSUER_NAME);
+                    .containsExactly("corp", OidcIssuerConfig.COGNITO_ISSUER_NAME);
+        }
+
+        @Test
+        void shouldVerifyTokensFromTheUserPoolWithAConfiguredIssuerForThatPool() {
+            properties.set(API_AUTH_OIDC_ISSUERS, """
+                    [{"name": "pool-other-app", "issuer": "%s", "audiences": ["other-client-id"],
+                      "jwksUri": "%s/.well-known/jwks.json"}]
+                    """.formatted(POOL_ISSUER, POOL_ISSUER));
+            deployUserPool();
+
+            assertThat(registry().issuers())
+                    .extracting(OidcIssuerConfig::name, OidcIssuerConfig::audiences, OidcIssuerConfig::requiredClaims)
+                    .containsExactly(tuple("pool-other-app", List.of("other-client-id"), Map.of()));
         }
 
     }

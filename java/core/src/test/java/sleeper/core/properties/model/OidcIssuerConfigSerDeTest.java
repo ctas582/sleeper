@@ -18,6 +18,8 @@ package sleeper.core.properties.model;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 import java.util.Map;
@@ -301,6 +303,15 @@ public class OidcIssuerConfigSerDeTest {
                     issuerJson("corp", "https://second.internal"))))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("unique name");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"AWS Cognito", "aws cognito", " AWS Cognito "})
+        void shouldRefuseTheNameReservedForTheUserPool(String name) {
+            assertThatThrownBy(() -> OidcIssuerConfigSerDe.readList(json(
+                    issuerJson(name, ISSUER))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("reserved");
         }
 
         @Test

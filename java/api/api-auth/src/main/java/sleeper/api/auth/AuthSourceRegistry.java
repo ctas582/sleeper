@@ -36,15 +36,17 @@ import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_A
 
 /**
  * The ways a client may authenticate with an instance's REST API.
+ * <p>
+ * If a configured issuer has the same issuer identifier as the Cognito user pool Sleeper created for the instance, the
+ * configured issuer is used in place of the user pool's built-in configuration.
  */
 public class AuthSourceRegistry {
-
-    public static final String COGNITO_ISSUER_NAME = "cognito";
 
     private final Map<String, OidcIssuerConfig> issuersByIssuer;
     private final boolean iamEnabled;
 
     private AuthSourceRegistry(List<OidcIssuerConfig> issuers, boolean iamEnabled) {
+        // The first issuer with a given identifier is kept. Configured issuers come before the user pool, so they win.
         this.issuersByIssuer = issuers.stream().collect(Collectors.toMap(
                 OidcIssuerConfig::issuer, Function.identity(), (first, second) -> first, LinkedHashMap::new));
         this.iamEnabled = iamEnabled;
@@ -83,7 +85,7 @@ public class AuthSourceRegistry {
         String loginUrl = properties.get(REST_API_COGNITO_LOGIN_URL);
 
         OidcIssuerConfig.Builder builder = OidcIssuerConfig.builder()
-                .name(COGNITO_ISSUER_NAME)
+                .name(OidcIssuerConfig.COGNITO_ISSUER_NAME)
                 .issuer(issuer)
                 .audiences(List.of(clientId))
                 .jwksUri(issuer + "/.well-known/jwks.json")
