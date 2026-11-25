@@ -163,8 +163,8 @@
                             <goal>exec</goal>
                         </goals>
                         <configuration>
-                            <executable>${maven.multiModuleProjectDirectory}/../typescript/ui/build-for-maven.sh</executable>
-                            <workingDirectory>${maven.multiModuleProjectDirectory}/../typescript/ui</workingDirectory>
+                            <executable>${project.basedir}/../../../typescript/ui/build-for-maven.sh</executable>
+                            <workingDirectory>${project.basedir}/../../../typescript/ui</workingDirectory>
                             <useMavenLogger>true</useMavenLogger>
                         </configuration>
                     </execution>
