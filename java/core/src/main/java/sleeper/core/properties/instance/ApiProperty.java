@@ -60,6 +60,7 @@ public interface ApiProperty {
                     "\n" +
                     "A principal is written as iam#<role ARN> or jwt#<issuer>#<subject>. For example:\n" +
                     "iam#arn:aws:iam::123456789012:role/SleeperAdmin,jwt#https://idp.internal/realms/sleeper#a1b2c3")
+            .validationPredicate(SleeperPropertyValueUtils::isValidPrincipalList)
             .propertyGroup(InstancePropertyGroup.API).build();
     UserDefinedInstanceProperty API_AUTH_IAM_ENABLED = Index.propertyBuilder("sleeper.rest.api.auth.iam.enabled")
             .description("Whether to deploy an API endpoint that authenticates clients by their IAM role, using " +

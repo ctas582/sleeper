@@ -34,6 +34,10 @@
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>arns</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
 
         <!-- Sleeper dependencies -->
         <dependency>

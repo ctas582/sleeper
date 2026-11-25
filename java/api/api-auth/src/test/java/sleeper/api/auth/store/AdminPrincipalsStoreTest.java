@@ -22,7 +22,6 @@ import sleeper.api.auth.iam.IamPrincipalMapper;
 import sleeper.core.properties.instance.InstanceProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_ADMIN_PRINCIPALS;
 
 public class AdminPrincipalsStoreTest {
@@ -84,10 +83,11 @@ public class AdminPrincipalsStoreTest {
     }
 
     @Test
-    void shouldRefuseAPrincipalThatCannotBeRead() {
-        properties.set(API_AUTH_ADMIN_PRINCIPALS, "arn:aws:iam::123456789012:role/SleeperAdmin");
+    void shouldIgnoreAPrincipalThatCannotBeReadAndKeepTheOthers() {
+        properties.set(API_AUTH_ADMIN_PRINCIPALS, "arn:aws:iam::123456789012:role/Typo,iam#" + ROLE_ARN);
 
-        assertThatThrownBy(this::store).isInstanceOf(IllegalArgumentException.class);
+        assertThat(store().permissionsFor(PrincipalId.forIamRole(ROLE_ARN)).isAdmin()).isTrue();
+        assertThat(store().permissionsFor(PrincipalId.forIamRole("arn:aws:iam::123456789012:role/Typo")).isAdmin()).isFalse();
     }
 
     private AdminPrincipalsStore store() {

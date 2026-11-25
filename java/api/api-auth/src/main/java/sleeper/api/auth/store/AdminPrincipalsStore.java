@@ -15,6 +15,9 @@
  */
 package sleeper.api.auth.store;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import sleeper.api.auth.PrincipalId;
 import sleeper.api.auth.PrincipalPermissions;
 import sleeper.core.properties.instance.InstanceProperties;
@@ -31,6 +34,7 @@ import static sleeper.core.properties.instance.ApiProperty.API_AUTH_ADMIN_PRINCI
  * the way back in if the managed allow-list is misconfigured.
  */
 public class AdminPrincipalsStore implements PrincipalPermissionStore {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AdminPrincipalsStore.class);
 
     private final Set<PrincipalId> admins;
 
@@ -41,13 +45,19 @@ public class AdminPrincipalsStore implements PrincipalPermissionStore {
     /**
      * Reads the administrators listed in the instance properties.
      *
-     * @param  properties               the instance properties
-     * @return                          the store
-     * @throws IllegalArgumentException if a principal in the list could not be read
+     * @param  properties the instance properties
+     * @return            the store
      */
     public static AdminPrincipalsStore from(InstanceProperties properties) {
         Set<PrincipalId> admins = new LinkedHashSet<>();
-        properties.getList(API_AUTH_ADMIN_PRINCIPALS).forEach(principal -> admins.add(PrincipalId.parse(principal)));
+        for (String principal : properties.getList(API_AUTH_ADMIN_PRINCIPALS)) {
+            try {
+                admins.add(PrincipalId.parse(principal));
+            } catch (IllegalArgumentException e) {
+                LOGGER.error("Ignoring an administrator in {} that could not be read: {}",
+                        API_AUTH_ADMIN_PRINCIPALS.getPropertyName(), e.getMessage());
+            }
+        }
         return new AdminPrincipalsStore(admins);
     }
 

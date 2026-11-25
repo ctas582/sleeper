@@ -77,13 +77,20 @@ public class PrincipalId {
         }
         PrincipalType type = PrincipalType.fromPrefix(id.substring(0, separator))
                 .orElseThrow(() -> new IllegalArgumentException(unreadable(id)));
+        String value = id.substring(separator + 1);
         if (type == PrincipalType.IAM) {
-            return IamPrincipalMapper.principalFor(id.substring(separator + 1))
+            return IamPrincipalMapper.principalFor(value)
                     .orElseThrow(() -> new IllegalArgumentException("Could not read the ARN in the principal \"" + id +
                             "\". Expected the ARN of an IAM role or user, such as " +
                             "iam#arn:aws:iam::123456789012:role/name."));
         }
-        return new PrincipalId(type, id);
+        int subjectSeparator = value.indexOf(SEPARATOR);
+        if (subjectSeparator < 1 || value.substring(0, subjectSeparator).isBlank()
+                || value.substring(subjectSeparator + 1).isBlank()) {
+            throw new IllegalArgumentException("Could not read the issuer and subject in the principal \"" + id +
+                    "\". Expected jwt#<issuer>#<subject>.");
+        }
+        return forToken(value.substring(0, subjectSeparator), value.substring(subjectSeparator + 1));
     }
 
     public PrincipalType getType() {

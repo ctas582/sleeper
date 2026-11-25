@@ -141,6 +141,19 @@ public class PrincipalIdTest {
                     .hasMessageContaining(principal);
         }
 
+        @ParameterizedTest
+        @ValueSource(strings = {
+            "jwt#https://idp.internal/realms/sleeper",
+            "jwt##a1b2c3",
+            "jwt# #a1b2c3",
+            "jwt#https://idp.internal/realms/sleeper#",
+            "jwt#https://idp.internal/realms/sleeper# "})
+        void shouldRefuseATokenSubjectWithoutAnIssuerAndSubject(String principal) {
+            assertThatThrownBy(() -> PrincipalId.parse(principal))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining(principal);
+        }
+
         @Test
         void shouldRefuseNothing() {
             assertThatThrownBy(() -> PrincipalId.parse(null))
