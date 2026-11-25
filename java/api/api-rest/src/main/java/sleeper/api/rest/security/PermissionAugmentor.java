@@ -19,7 +19,9 @@ import io.quarkus.security.identity.AuthenticationRequestContext;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.quarkus.security.identity.SecurityIdentityAugmentor;
 import io.quarkus.security.runtime.QuarkusSecurityIdentity;
+import io.quarkus.vertx.http.runtime.security.HttpSecurityUtils;
 import io.smallrye.mutiny.Uni;
+import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.jwt.JsonWebToken;
@@ -31,6 +33,7 @@ import sleeper.api.auth.store.AdminPrincipalsStore;
 import sleeper.api.rest.config.InstancePropertiesProvider;
 
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -50,8 +53,14 @@ public class PermissionAugmentor implements SecurityIdentityAugmentor {
 
     @Override
     public Uni<SecurityIdentity> augment(SecurityIdentity identity, AuthenticationRequestContext context) {
+        return augment(identity, context, Map.of());
+    }
+
+    @Override
+    public Uni<SecurityIdentity> augment(SecurityIdentity identity, AuthenticationRequestContext context, Map<String, Object> attributes) {
+        RoutingContext request = HttpSecurityUtils.getRoutingContextAttribute(attributes);
         return principalOf(identity)
-                .map(principal -> context.runBlocking(() -> withPermissions(identity, principal)))
+                .map(principal -> context.runBlocking(() -> withPermissions(identity, principal, request)))
                 .orElseGet(() -> Uni.createFrom().item(identity));
     }
 
@@ -87,10 +96,11 @@ public class PermissionAugmentor implements SecurityIdentityAugmentor {
      *
      * @param  identity  the identity for the request
      * @param  principal who the client is
+     * @param  request   the request being served, or null if it is not known
      * @return           the identity, carrying what they are allowed to do
      */
-    private SecurityIdentity withPermissions(SecurityIdentity identity, PrincipalId principal) {
-        PrincipalPermissions permissions = AdminPrincipalsStore.from(instanceProperties.get()).permissionsFor(principal);
+    private SecurityIdentity withPermissions(SecurityIdentity identity, PrincipalId principal, RoutingContext request) {
+        PrincipalPermissions permissions = AdminPrincipalsStore.from(instanceProperties.getCached(request)).permissionsFor(principal);
         QuarkusSecurityIdentity.Builder builder = QuarkusSecurityIdentity.builder()
                 .setPrincipal(identity.getPrincipal())
                 .addAttributes(identity.getAttributes())

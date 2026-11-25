@@ -15,6 +15,7 @@
  */
 package sleeper.api.rest.resource;
 
+import io.vertx.ext.web.RoutingContext;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -43,13 +44,14 @@ public class InstancePropertiesResource {
     /**
      * Reports the properties set for the instance, with the value of each.
      *
-     * @return the properties
+     * @param  request the request being served
+     * @return         the properties
      */
     @GET
     @RolesAllowed("READ_INSTANCE_CONFIGURATION")
     @Produces(MediaType.APPLICATION_JSON)
-    public Properties get() {
-        InstanceProperties properties = instanceProperties.get();
+    public Properties get(RoutingContext request) {
+        InstanceProperties properties = instanceProperties.getCached(request);
         return properties.getProperties();
     }
 

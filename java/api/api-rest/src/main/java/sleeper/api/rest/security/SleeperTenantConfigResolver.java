@@ -52,18 +52,19 @@ public class SleeperTenantConfigResolver implements TenantConfigResolver {
         if (token.isEmpty()) {
             return Uni.createFrom().nullItem();
         }
-        return requestContext.runBlocking(() -> configFor(token.get()));
+        return requestContext.runBlocking(() -> configFor(token.get(), context));
     }
 
     /**
      * Finds the configuration to verify a token with, from the issuer it claims to come from.
      *
-     * @param  token the token presented by the client
-     * @return       the configuration, or null if the instance cannot verify a token like this one
+     * @param  token   the token presented by the client
+     * @param  request the request the token was presented with
+     * @return         the configuration, or null if the instance cannot verify a token like this one
      */
-    private OidcTenantConfig configFor(String token) {
+    private OidcTenantConfig configFor(String token, RoutingContext request) {
         Optional<OidcIssuerConfig> found = BearerTokenIssuerReader.issuerOf(token)
-                .flatMap(issuer -> AuthSourceRegistry.from(instanceProperties.get()).forIssuer(issuer));
+                .flatMap(issuer -> AuthSourceRegistry.from(instanceProperties.getCached(request)).forIssuer(issuer));
         if (found.isEmpty()) {
             return null;
         }

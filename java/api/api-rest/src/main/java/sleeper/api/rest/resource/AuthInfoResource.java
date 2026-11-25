@@ -16,6 +16,7 @@
 package sleeper.api.rest.resource;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.vertx.ext.web.RoutingContext;
 import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -52,13 +53,14 @@ public class AuthInfoResource {
     /**
      * Reports how a client may authenticate with this instance.
      *
-     * @return the ways a client may authenticate
+     * @param  request the request being served
+     * @return         the ways a client may authenticate
      */
     @GET
     @PermitAll
     @Produces(MediaType.APPLICATION_JSON)
-    public AuthInfo get() {
-        AuthSourceRegistry sources = AuthSourceRegistry.from(instanceProperties.get());
+    public AuthInfo get(RoutingContext request) {
+        AuthSourceRegistry sources = AuthSourceRegistry.from(instanceProperties.getCached(request));
         return new AuthInfo(
                 sources.isConfigured(),
                 sources.issuers().stream().map(AuthInfoResource::describe).toList(),

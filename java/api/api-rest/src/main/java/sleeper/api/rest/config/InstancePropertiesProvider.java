@@ -15,6 +15,7 @@
  */
 package sleeper.api.rest.config;
 
+import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -31,6 +32,8 @@ import java.util.Optional;
 @ApplicationScoped
 public class InstancePropertiesProvider {
 
+    private static final String CACHE_FOR_REQUEST = InstancePropertiesProvider.class.getName() + ".cache";
+
     private final S3Client s3Client;
     private final String configBucket;
 
@@ -45,11 +48,34 @@ public class InstancePropertiesProvider {
     }
 
     /**
-     * Reads the configuration of the instance.
+     * Reads the instance properties. A cached version is returned if called multiple times for the same request.
      *
-     * @return the configuration
+     * @param  request the request being served, or null if not serving a request
+     * @return         the configuration
      */
-    public InstanceProperties get() {
+    public InstanceProperties getCached(RoutingContext request) {
+        InstanceProperties cache = request == null ? null : request.get(CACHE_FOR_REQUEST);
+        if (cache != null) {
+            return cache;
+        }
+        return getLatest(request);
+    }
+
+    /**
+     * Reads the latest configuration of the instance, replacing any copy already read while serving the request.
+     *
+     * @param  request the request being served, or null if not serving a request
+     * @return         the configuration
+     */
+    public InstanceProperties getLatest(RoutingContext request) {
+        InstanceProperties loaded = load();
+        if (request != null) {
+            request.put(CACHE_FOR_REQUEST, loaded);
+        }
+        return loaded;
+    }
+
+    private InstanceProperties load() {
         try {
             return S3InstanceProperties.loadFromBucket(s3Client, configBucket);
         } catch (RuntimeException e) {
