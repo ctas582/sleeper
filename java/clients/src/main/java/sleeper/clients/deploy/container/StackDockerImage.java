@@ -87,7 +87,7 @@ public class StackDockerImage {
     public static StackDockerImage fromLambdaImage(LambdaJar lambdaJar) {
         return builder()
                 .imageName(lambdaJar.getImageName())
-                .directoryName("lambda")
+                .directoryName(lambdaJar.isZipArchive() ? "lambda-zip" : "lambda")
                 .lambdaJar(lambdaJar)
                 .build();
     }

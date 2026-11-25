@@ -153,6 +153,16 @@ public class LambdaJar {
     }
 
     /**
+     * Checks whether this is a zip archive in the layout AWS Lambda accepts for a Java function, with classes at the
+     * root and dependencies as jars under lib/. Otherwise this is a single jar holding everything the function needs.
+     *
+     * @return true if this is a zip archive
+     */
+    public boolean isZipArchive() {
+        return filenameFormat.endsWith(".zip");
+    }
+
+    /**
      * Formats the filename with the supplied version.
      *
      * @param  version the version of Sleeper to use in the format

@@ -26,7 +26,6 @@ import sleeper.core.util.cli.CommandLineUsage;
 import sleeper.core.util.cli.CommandOption;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -84,15 +83,10 @@ public class BuildDockerImage {
         StackDockerImage image = configuration.getDockerImageByName(args.imageName()).orElseThrow();
         Path dockerfileDirectory = args.dockerDir().resolve(image.getDirectoryName());
 
-        image.getLambdaJar().ifPresent(jar -> {
-            Path copyFrom = args.jarsDir().resolve(jar.getFilename(SleeperVersion.getVersion()));
-            Path copyTo = dockerfileDirectory.resolve("lambda.jar");
-            try {
-                fileCopier.copy(copyFrom, copyTo, StandardCopyOption.REPLACE_EXISTING);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        });
+        image.getLambdaJar().ifPresent(jar -> LambdaDockerBuildContext.addLambdaCode(jar,
+                args.jarsDir().resolve(jar.getFilename(SleeperVersion.getVersion())),
+                dockerfileDirectory,
+                (source, target) -> fileCopier.copy(source, target, StandardCopyOption.REPLACE_EXISTING)));
 
         List<String> dockerCommand = new ArrayList<>();
         List<String> dockerOptions = new ArrayList<>();

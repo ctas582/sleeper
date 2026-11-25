@@ -20,16 +20,21 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import sleeper.clients.deploy.DeployConfiguration;
+import sleeper.core.deploy.LambdaHandler;
+import sleeper.core.deploy.LambdaJar;
 import sleeper.core.properties.model.LambdaDeployType;
 import sleeper.core.properties.model.OptionalStack;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static java.util.stream.Collectors.toUnmodifiableList;
 import static java.util.stream.Collectors.toUnmodifiableMap;
@@ -89,6 +94,44 @@ public class UploadDockerImagesToEcrFileIT extends UploadDockerImagesToEcrTestBa
                 jarsDir.resolve("statestore.jar"), "statestore-jar-content",
                 jarsDir.resolve("ingest.jar"), "ingest-jar-content",
                 lambdaImageDir.resolve("lambda.jar"), "ingest-jar-content"));
+    }
+
+    @Test
+    void shouldUnpackZipArchiveForLambdaImage() throws Exception {
+        // Given
+        properties.setEnumList(OPTIONAL_STACKS, List.of(OptionalStack.ApiStack));
+        properties.set(LAMBDA_DEPLOY_TYPE, LambdaDeployType.CONTAINER.toString());
+        Path zipImageDir = Files.createDirectories(dockerDir.resolve("lambda-zip"));
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(jarsDir.resolve("api.zip")))) {
+            zip.putNextEntry(new ZipEntry("lib/dependency.jar"));
+            zip.write("dependency-content".getBytes(StandardCharsets.UTF_8));
+            zip.closeEntry();
+        }
+        DockerImageConfiguration imageConfig = new DockerImageConfiguration(StackDockerImage.DEFAULT_BASE, List.of(),
+                List.of(LambdaHandler.builder()
+                        .jar(LambdaJar.builder()
+                                .filenameFormat("api.zip")
+                                .imageName("api-lambda")
+                                .artifactId("api").build())
+                        .handler("ApiLambda")
+                        .optionalStack(OptionalStack.ApiStack).build()));
+
+        // When
+        uploadForDeployment(imageConfig);
+
+        // Then
+        String expectedBaseTag = "localhost:5000/base:1.0.0";
+        String expectedTag = "123.dkr.ecr.test-region.amazonaws.com/test-instance/api-lambda:1.0.0";
+        assertThat(commandsThatRan).containsExactly(
+                dockerLoginToEcrCommand(),
+                startBaseImageRegistryCommand(),
+                createBuildxBuilderInstanceCommand(),
+                useBuildxBuilderInstanceCommand(),
+                buildAndPushMultiplatformImageCommand(expectedBaseTag, dockerDir.toString() + "/base"),
+                buildLambdaImageCommand(expectedTag, zipImageDir.toString(), expectedBaseTag),
+                pushImageCommand(expectedTag));
+        assertThat(Files.readString(zipImageDir.resolve("function/lib/dependency.jar")))
+                .isEqualTo("dependency-content");
     }
 
     @Override

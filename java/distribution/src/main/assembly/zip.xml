@@ -74,6 +74,14 @@
             </excludes>
         </fileSet>
         <fileSet>
+            <directory>${project.basedir}/../common/docker-lambda/docker-zip</directory>
+            <outputDirectory>scripts/docker/lambda-zip</outputDirectory>
+            <excludes>
+                <exclude>*.jar</exclude>
+                <exclude>function/**</exclude>
+            </excludes>
+        </fileSet>
+        <fileSet>
             <directory>${project.basedir}/../compaction/compaction-job-execution/docker</directory>
             <outputDirectory>scripts/docker/compaction-job-execution</outputDirectory>
             <excludes>
@@ -304,6 +312,13 @@
                 ${project.basedir}/../common/docker-lambda/target/docker-lambda-${project.version}-utility.jar
             </source>
             <outputDirectory>scripts/docker/lambda</outputDirectory>
+            <destName>aws-lambda-java-runtime.jar</destName>
+        </file>
+        <file>
+            <source>
+                ${project.basedir}/../common/docker-lambda/target/docker-lambda-${project.version}-utility.jar
+            </source>
+            <outputDirectory>scripts/docker/lambda-zip</outputDirectory>
             <destName>aws-lambda-java-runtime.jar</destName>
         </file>
         <file>

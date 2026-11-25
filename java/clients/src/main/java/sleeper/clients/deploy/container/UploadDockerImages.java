@@ -165,11 +165,10 @@ public class UploadDockerImages {
 
     private void buildAndPushImage(String tag, StackDockerImage image, Map<String, String> buildArgs) throws IOException, InterruptedException {
         Path dockerfileDirectory = image.resolveBuildContext(baseDockerDirectory, deployConfig);
-        image.getLambdaJar().ifPresent(jar -> {
-            copyFile.copyWrappingExceptions(
-                    jarsDirectory.resolve(jar.getFilename(version)),
-                    dockerfileDirectory.resolve("lambda.jar"));
-        });
+        image.getLambdaJar().ifPresent(jar -> LambdaDockerBuildContext.addLambdaCode(jar,
+                jarsDirectory.resolve(jar.getFilename(version)),
+                dockerfileDirectory,
+                copyFile));
 
         if (image.isMultiplatform()) {
             String platformList = ContainerPlatform.buildPlatformListArgument(image.getPlatforms());
