@@ -177,6 +177,10 @@ public class OidcIssuerConfigSerDe {
         if (keys == null || !keys.isJsonArray()) {
             throw new IllegalArgumentException("OIDC issuer publicKey must be a JSON Web Key Set, holding keys.");
         }
+        if (keys.getAsJsonArray().isEmpty()) {
+            throw new IllegalArgumentException("OIDC issuer publicKey must hold at least one key, or no token from " +
+                    "the issuer could be verified.");
+        }
         for (JsonElement key : keys.getAsJsonArray()) {
             JsonElement keyType = key.isJsonObject() ? key.getAsJsonObject().get("kty") : null;
             if (keyType == null || !keyType.isJsonPrimitive() || !"RSA".equals(keyType.getAsString())) {

@@ -107,6 +107,26 @@ public class OidcIssuerConfigSerDeTest {
         }
 
         @Test
+        void shouldRefuseAKeySetWithAnEmptyListOfKeys() {
+            assertThatThrownBy(() -> OidcIssuerConfigSerDe.readList(json("""
+                    {"name": "isolated", "issuer": "%s", "audiences": ["sleeper-api"],
+                     "publicKey": {"keys": []}}
+                    """.formatted(ISSUER))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("at least one key");
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"", "   "})
+        void shouldRefuseAnEmptyKey(String key) {
+            assertThatThrownBy(() -> OidcIssuerConfigSerDe.readList(json("""
+                    {"name": "isolated", "issuer": "%s", "audiences": ["sleeper-api"], "publicKey": "%s"}
+                    """.formatted(ISSUER, key))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("empty publicKey");
+        }
+
+        @Test
         void shouldWriteKeySetBackAsJsonSoThatItIsNotTurnedIntoAString() {
             String json = json("""
                     {"name": "isolated", "issuer": "%s", "audiences": ["sleeper-api"],

@@ -82,6 +82,10 @@ public record OidcIssuerConfig(
                     "accepted by Sleeper.");
         }
         audiences.forEach(audience -> requireNonBlank(audience, "audience"));
+        if (publicKey != null && publicKey.isBlank()) {
+            throw new IllegalArgumentException("OIDC issuer \"" + name + "\" has an empty publicKey. Set it to the " +
+                    "key the issuer signs its tokens with, or set jwksUri instead to fetch the issuer's keys.");
+        }
         if (jwksUri == null && publicKey == null) {
             throw new IllegalArgumentException("OIDC issuer \"" + name + "\" must set either jwksUri or publicKey, " +
                     "to supply the keys its tokens are signed with.");
