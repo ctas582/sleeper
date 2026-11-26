@@ -28,6 +28,11 @@ jobs:
         with:
           java-version: '17'
           distribution: 'corretto'
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: typescript/ui/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: typescript/ui/package-lock.json
       - name: Restore cache of Maven dependencies
         uses: actions/cache/restore@v6
         id: restore-cache

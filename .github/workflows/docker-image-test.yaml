@@ -62,6 +62,11 @@ jobs:
         with:
           java-version: '17'
           distribution: 'corretto'
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: typescript/ui/.nvmrc
+          cache: 'npm'
+          cache-dependency-path: typescript/ui/package-lock.json
       - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Cache dependencies
         uses: actions/cache/restore@v6
