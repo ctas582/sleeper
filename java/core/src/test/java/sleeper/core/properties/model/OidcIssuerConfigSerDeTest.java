@@ -149,11 +149,13 @@ public class OidcIssuerConfigSerDeTest {
         void shouldReadTheDetailsABrowserNeedsToSendSomeoneToSignIn() {
             assertThat(OidcIssuerConfigSerDe.readList(json("""
                     {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
-                     "authEndpoint": "https://idp.internal/authorize", "clientId": "sleeper-ui"}
+                     "authEndpoint": "https://idp.internal/authorize", "logoutEndpoint": "https://idp.internal/logout",
+                     "clientId": "sleeper-ui"}
                     """.formatted(ISSUER, JWKS_URI))))
                     .containsExactly(OidcIssuerConfig.builder()
                             .name("corp").issuer(ISSUER).audiences(List.of("sleeper-api")).jwksUri(JWKS_URI)
                             .authEndpoint("https://idp.internal/authorize")
+                            .logoutEndpoint("https://idp.internal/logout")
                             .clientId("sleeper-ui")
                             .build());
         }
@@ -189,6 +191,7 @@ public class OidcIssuerConfigSerDeTest {
                     {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
                      "tokenEndpoint": "https://idp.internal/token",
                      "authEndpoint": "https://idp.internal/authorize", "clientId": "sleeper-ui",
+                     "logoutEndpoint": "https://idp.internal/logout",
                      "requiredClaims": {"token_use": "id"},
                      "principalClaim": "preferred_username", "clockSkewSeconds": 120}
                     """.formatted(ISSUER, JWKS_URI));

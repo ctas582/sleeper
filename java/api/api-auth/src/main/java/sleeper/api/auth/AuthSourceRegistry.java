@@ -94,7 +94,8 @@ public class AuthSourceRegistry {
 
         if (loginUrl != null && !loginUrl.isBlank()) {
             builder.authEndpoint(loginUrl + "/oauth2/authorize")
-                    .tokenEndpoint(loginUrl + "/oauth2/token");
+                    .tokenEndpoint(loginUrl + "/oauth2/token")
+                    .logoutEndpoint(loginUrl + "/logout");
         }
 
         return Optional.of(builder.build());

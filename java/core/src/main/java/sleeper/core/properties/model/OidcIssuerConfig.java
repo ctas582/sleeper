@@ -40,7 +40,9 @@ import java.util.Map;
  * @param tokenEndpoint     the endpoint where automation can exchange client credentials for a token, reported by the
  *                          API so that scripts do not need to hard code it, or null if not known
  * @param authEndpoint      the endpoint a browser sends someone to in order to sign in, or null if not known
- * @param clientId          the application a client signs in to, which a browser must name when it sends someone to
+ * @param logoutEndpoint    the endpoint a browser sends someone to in order to end their session with the issuer, or
+ *                          null if not known, in which case signing out only forgets their tokens in the browser
+ * @param clientId         the application a client signs in to, which a browser must name when it sends someone to
  *                          sign in, or null if not known
  * @param principalClaim    the claim holding the identifier of the client, used to look them up in the principal
  *                          allow-list
@@ -56,6 +58,7 @@ public record OidcIssuerConfig(
         String publicKey,
         String tokenEndpoint,
         String authEndpoint,
+        String logoutEndpoint,
         String clientId,
         String principalClaim,
         int clockSkewSeconds,
@@ -99,6 +102,9 @@ public record OidcIssuerConfig(
         }
         if (authEndpoint != null) {
             requireAbsoluteUri(authEndpoint, "authEndpoint");
+        }
+        if (logoutEndpoint != null) {
+            requireAbsoluteUri(logoutEndpoint, "logoutEndpoint");
         }
         requireNonBlank(principalClaim, "principalClaim");
         if (clockSkewSeconds < 0 || clockSkewSeconds > MAX_CLOCK_SKEW_SECONDS) {
@@ -157,6 +163,7 @@ public record OidcIssuerConfig(
         private String publicKey;
         private String tokenEndpoint;
         private String authEndpoint;
+        private String logoutEndpoint;
         private String clientId;
         private String principalClaim = DEFAULT_PRINCIPAL_CLAIM;
         private int clockSkewSeconds = DEFAULT_CLOCK_SKEW_SECONDS;
@@ -247,6 +254,19 @@ public record OidcIssuerConfig(
         }
 
         /**
+         * Sets the endpoint a browser sends someone to in order to end their session with the issuer when they sign
+         * out. Without this, signing out only forgets their tokens in the browser, and the issuer may sign them
+         * straight back in as the same user.
+         *
+         * @param  logoutEndpoint the endpoint
+         * @return                this builder
+         */
+        public Builder logoutEndpoint(String logoutEndpoint) {
+            this.logoutEndpoint = logoutEndpoint;
+            return this;
+        }
+
+        /**
          * Sets the application a client signs in to, which a browser must name when it sends someone to sign in.
          *
          * @param  clientId the application identifier
@@ -296,7 +316,7 @@ public record OidcIssuerConfig(
 
         public OidcIssuerConfig build() {
             return new OidcIssuerConfig(name, issuer, audiences, jwksUri, publicKey, tokenEndpoint,
-                    authEndpoint, clientId, principalClaim, clockSkewSeconds, requiredClaims);
+                    authEndpoint, logoutEndpoint, clientId, principalClaim, clockSkewSeconds, requiredClaims);
         }
     }
 

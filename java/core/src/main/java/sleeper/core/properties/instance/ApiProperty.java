@@ -38,6 +38,9 @@ public interface ApiProperty {
                     "Optionally set principalClaim (defaults to sub), clockSkewSeconds, and tokenEndpoint. The " +
                     "token endpoint is reported by the API so that automation does not need to hard code it.\n" +
                     "\n" +
+                    "To sign in from the UI, set authEndpoint and clientId. Optionally set logoutEndpoint, so that " +
+                    "signing out of the UI also ends the session with the issuer.\n" +
+                    "\n" +
                     "For example:\n" +
                     "[{\"name\":\"corp\",\"issuer\":\"https://idp.internal/realms/sleeper\"," +
                     "\"audiences\":[\"sleeper-api\"]," +

@@ -19,6 +19,7 @@ export interface Issuer {
 	issuer: string
 	tokenEndpoint?: string
 	authEndpoint?: string
+	logoutEndpoint?: string
 	clientId?: string
 }
 

@@ -38,6 +38,7 @@ export function userManagerSettingsFor(issuer: Issuer): UserManagerSettings {
 			issuer: issuer.issuer,
 			authorization_endpoint: issuer.authEndpoint,
 			token_endpoint: issuer.tokenEndpoint,
+			...(issuer.logoutEndpoint ? { end_session_endpoint: issuer.logoutEndpoint } : {}),
 		},
 		automaticSilentRenew: true,
 		userStore: new WebStorageStateStore({ store: window.sessionStorage, prefix: storagePrefix(issuer) }),

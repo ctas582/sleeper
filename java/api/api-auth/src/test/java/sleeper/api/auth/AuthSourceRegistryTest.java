@@ -191,6 +191,15 @@ public class AuthSourceRegistryTest {
         }
 
         @Test
+        void shouldTellABrowserWhereToSendSomeoneToEndTheirSessionWithThePool() {
+            deployUserPool();
+
+            assertThat(registry().forIssuer(POOL_ISSUER))
+                    .map(OidcIssuerConfig::logoutEndpoint)
+                    .contains(POOL_LOGIN_URL + "/logout");
+        }
+
+        @Test
         void shouldTrustNoPoolWhenNotDeployed() {
             deployUserPool();
             properties.set(API_AUTH_COGNITO_ENABLED, "false");

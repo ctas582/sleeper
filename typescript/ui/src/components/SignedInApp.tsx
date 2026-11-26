@@ -15,6 +15,7 @@
  */
 
 import { useAuth } from 'react-oidc-context'
+import { forgetIssuer } from '../auth/rememberedIssuer'
 import { WhoAmI } from './WhoAmI'
 
 interface Props {
@@ -48,13 +49,23 @@ export function SignedInApp({ issuerName, onChangeIssuer }: Props) {
 			</>
 		)
 	}
-	return (
-		<WhoAmI
-			idToken={auth.user.id_token}
-			onSignOut={() => {
-				onChangeIssuer()
-				void auth.removeUser()
-			}}
-		/>
-	)
+	const signOutLocally = () => {
+		onChangeIssuer()
+		void auth.removeUser()
+	}
+	const signOut = () => {
+		if (!auth.settings.metadata?.end_session_endpoint) {
+			signOutLocally()
+			return
+		}
+
+		// Leaves the page for the issuer, which ends the session there and returns to the choice of issuer
+		forgetIssuer()
+		const returnTo = auth.settings.post_logout_redirect_uri ?? window.location.origin + '/'
+		auth.signoutRedirect({
+			// Cognito ignores the standard parameters, and needs these to end the session and come back here
+			extraQueryParams: { client_id: auth.settings.client_id, logout_uri: returnTo },
+		}).catch(signOutLocally)
+	}
+	return <WhoAmI idToken={auth.user.id_token} onSignOut={signOut} />
 }

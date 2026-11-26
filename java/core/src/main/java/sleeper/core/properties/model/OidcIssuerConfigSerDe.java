@@ -109,6 +109,7 @@ public class OidcIssuerConfigSerDe {
                 .publicKey(readKey(object, "publicKey"))
                 .tokenEndpoint(readString(object, "tokenEndpoint"))
                 .authEndpoint(readString(object, "authEndpoint"))
+                .logoutEndpoint(readString(object, "logoutEndpoint"))
                 .clientId(readString(object, "clientId"))
                 .requiredClaims(readStringMap(object, "requiredClaims"));
         String principalClaim = readString(object, "principalClaim");
@@ -133,6 +134,7 @@ public class OidcIssuerConfigSerDe {
         addKeyIfSet(object, issuer.publicKey());
         addIfSet(object, "tokenEndpoint", issuer.tokenEndpoint());
         addIfSet(object, "authEndpoint", issuer.authEndpoint());
+        addIfSet(object, "logoutEndpoint", issuer.logoutEndpoint());
         addIfSet(object, "clientId", issuer.clientId());
         if (!issuer.requiredClaims().isEmpty()) {
             JsonObject requiredClaims = new JsonObject();
