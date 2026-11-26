@@ -57,6 +57,10 @@ Nimbus JOSE+JWT (com.nimbusds:nimbus-jose-jwt:10.*)
 
 - Apache License, Version 2.0
 
+Quarkus (io.quarkus.platform:*:3.*)
+
+- Apache License, Version 2.0
+
 Apache Avro (org.apache.avro:*:1.*)
 
 - Apache License, Version 2.0
