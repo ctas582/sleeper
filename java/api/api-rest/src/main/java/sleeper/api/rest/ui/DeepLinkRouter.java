@@ -30,6 +30,7 @@ import java.util.List;
 public class DeepLinkRouter {
 
     private static final String UI_PAGE = "/index.html";
+    private static final String FAVICON = "/favicon.ico";
     private static final List<String> NON_UI_ROUTE_PREFIXES = List.of("/api", "/q");
 
     /**
@@ -54,7 +55,7 @@ public class DeepLinkRouter {
             return false;
         }
         String path = context.normalizedPath();
-        if (UI_PAGE.equals(path) || "/".equals(path) || path.startsWith("/assets/")) {
+        if (UI_PAGE.equals(path) || "/".equals(path) || FAVICON.equals(path) || path.startsWith("/assets/")) {
             return false;
         }
         return NON_UI_ROUTE_PREFIXES.stream()

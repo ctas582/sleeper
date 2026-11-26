@@ -23,7 +23,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 
 /**
  * Checks that the user interface is served to a client who has not signed in.
@@ -41,6 +43,15 @@ class UserInterfaceTest {
                     .when().get(path)
                     .then()
                     .statusCode(200);
+        }
+
+        @Test
+        void shouldServeTheIconRatherThanTheInterface() {
+            given()
+                    .when().get("/favicon.ico")
+                    .then()
+                    .statusCode(200)
+                    .contentType(not(containsString("html")));
         }
     }
 
