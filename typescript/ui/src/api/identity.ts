@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import { errorFromResponse } from './apiError'
+
 export interface GrantedPermission {
 	permission: string
 	allTables?: boolean
@@ -35,7 +37,7 @@ export async function fetchIdentity(idToken: string): Promise<ClientIdentity> {
 		throw new Error('The instance did not accept this token. It may have expired, so try signing in again.')
 	}
 	if (!response.ok) {
-		throw new Error(`The instance would not say who this token belongs to (${response.status}).`)
+		throw await errorFromResponse(response, 'The instance would not say who this token belongs to')
 	}
 	return (await response.json()) as ClientIdentity
 }

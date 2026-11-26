@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+import type { ApiError } from '../api/apiError'
+import { errorFromResponse } from '../api/apiError'
+
 export interface Issuer {
 	name: string
 	issuer: string
@@ -27,17 +30,13 @@ export interface AuthInfo {
 	configured: boolean
 	issuers: Issuer[]
 	iamEnabled: boolean
-	error?: {
-		code: string
-		message: string
-		remediation?: string
-	}
+	error?: ApiError
 }
 
 export async function fetchAuthInfo(): Promise<AuthInfo> {
 	const response = await fetch('/api/v1/auth/info')
 	if (!response.ok) {
-		throw new Error(`The instance could not say how to authenticate with it (${response.status}).`)
+		throw await errorFromResponse(response, 'The instance could not say how to authenticate with it')
 	}
 	return (await response.json()) as AuthInfo
 }
