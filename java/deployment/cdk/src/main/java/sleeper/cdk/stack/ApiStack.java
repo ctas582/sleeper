@@ -57,6 +57,7 @@ import static sleeper.core.properties.instance.ApiProperty.API_AUTH_COGNITO_ENAB
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_IAM_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_CORS_ALLOWED_ORIGINS;
 import static sleeper.core.properties.instance.ApiProperty.API_LAMBDA_MEMORY_IN_MB;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.ACCOUNT;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_CLIENT_ID;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_ISSUER;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_LOGIN_URL;
@@ -129,7 +130,7 @@ public class ApiStack extends NestedStack {
 
         UserPoolDomain domain = userPool.addDomain("UserPoolDomain", UserPoolDomainOptions.builder()
                 .cognitoDomain(CognitoDomainOptions.builder()
-                        .domainPrefix(String.join("-", "sleeper", instanceId, "api"))
+                        .domainPrefix(String.join("-", "sleeper", instanceProperties.get(ACCOUNT), instanceId))
                         .build())
                 .managedLoginVersion(ManagedLoginVersion.NEWER_MANAGED_LOGIN)
                 .build());

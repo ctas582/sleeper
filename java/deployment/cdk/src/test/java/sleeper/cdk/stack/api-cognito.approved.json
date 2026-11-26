@@ -256,7 +256,7 @@
             "UserPoolId": {
               "Ref": "UserPool6BA7E5F2"
             },
-            "Domain": "sleeper-test-instance-api",
+            "Domain": "sleeper-test-account-test-instance",
             "ManagedLoginVersion": 2
           }
         },
