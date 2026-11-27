@@ -57,12 +57,9 @@ public interface ApiProperty {
             .validationPredicate(SleeperPropertyValueUtils::isValidOidcIssuers)
             .propertyGroup(InstancePropertyGroup.API).build();
     UserDefinedInstanceProperty API_AUTH_ADMIN_PRINCIPALS = Index.propertyBuilder("sleeper.rest.api.auth.admin.principals")
-            .description("A list of principals granted administrator access to the API, bypassing the managed " +
-                    "allow-list.\n" +
-                    "\n" +
-                    "This exists so that an administrator can be granted access before anyone is able to call the API " +
-                    "to grant access to others. It is also the way back in if the managed allow-list is " +
-                    "misconfigured. Keep it to as few principals as possible.\n" +
+            .description("A list of principals granted administrator access to the API. This is currently the only " +
+                    "way to grant access to the API, and it grants full access, so keep it to as few principals as " +
+                    "possible.\n" +
                     "\n" +
                     "A principal is written as iam#<role ARN> or jwt#<issuer>#<subject>. For example:\n" +
                     "iam#arn:aws:iam::123456789012:role/SleeperAdmin,jwt#https://idp.internal/realms/sleeper#a1b2c3")

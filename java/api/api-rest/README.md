@@ -71,4 +71,6 @@ awscurl --service execute-api --region <region> -H "Accept: application/json" \
 Authenticating establishes only who a client is. What they may do comes from the principal allow-list, never from a
 claim in the token they present.
 
-Use the instance property `sleeper.rest.api.auth.admin.principals` to grant an initial administrator. The API can then be used to grant access to others.
+Use the instance property `sleeper.rest.api.auth.admin.principals` to grant access. Each principal listed there has full
+administrator access, and this is currently the only way to grant access to the API. A client can see the principal they
+are identified by at `/api/v1/auth/me`, or in the UI once signed in.

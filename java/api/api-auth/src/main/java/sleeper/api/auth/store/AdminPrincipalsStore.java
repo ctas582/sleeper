@@ -29,9 +29,6 @@ import static sleeper.core.properties.instance.ApiProperty.API_AUTH_ADMIN_PRINCI
 
 /**
  * Grants administrator access to the principals listed in the instance properties.
- * <p>
- * This is how an administrator is granted access before anyone is able to call the API to grant access to others, and
- * the way back in if the managed allow-list is misconfigured.
  */
 public class AdminPrincipalsStore implements PrincipalPermissionStore {
     private static final Logger LOGGER = LoggerFactory.getLogger(AdminPrincipalsStore.class);
