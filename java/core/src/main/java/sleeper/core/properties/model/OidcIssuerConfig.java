@@ -105,15 +105,9 @@ public record OidcIssuerConfig(
                         "keys fetched from it determine which tokens are trusted. Found: " + jwksUri);
             }
         }
-        if (tokenEndpoint != null) {
-            requireAbsoluteUri(tokenEndpoint, "tokenEndpoint");
-        }
-        if (authEndpoint != null) {
-            requireAbsoluteUri(authEndpoint, "authEndpoint");
-        }
-        if (logoutEndpoint != null) {
-            requireAbsoluteUri(logoutEndpoint, "logoutEndpoint");
-        }
+        requireHttpsIfSet(name, tokenEndpoint, "tokenEndpoint");
+        requireHttpsIfSet(name, authEndpoint, "authEndpoint");
+        requireHttpsIfSet(name, logoutEndpoint, "logoutEndpoint");
         requireNonBlank(principalClaim, "principalClaim");
         if (clockSkewSeconds < 0 || clockSkewSeconds > MAX_CLOCK_SKEW_SECONDS) {
             throw new IllegalArgumentException("OIDC issuer \"" + name + "\" must set clockSkewSeconds between 0 and " +
@@ -157,6 +151,16 @@ public record OidcIssuerConfig(
             }
         } catch (URISyntaxException e) {
             throw new IllegalArgumentException("OIDC issuer " + field + " must be a valid URI, found: " + value, e);
+        }
+    }
+
+    private static void requireHttpsIfSet(String name, String value, String field) {
+        if (value == null) {
+            return;
+        }
+        requireAbsoluteUri(value, field);
+        if (!value.toLowerCase(Locale.ROOT).startsWith("https://")) {
+            throw new IllegalArgumentException("OIDC issuer \"" + name + "\" must use https for " + field + ". Found: " + value);
         }
     }
 

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
@@ -290,6 +291,21 @@ public class OidcIssuerConfigSerDeTest {
                     """.formatted(ISSUER, JWKS_URI)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("audience");
+        }
+
+        @ParameterizedTest
+        @CsvSource(delimiter = '|', value = {
+            "tokenEndpoint|http://idp.internal/token",
+            "authEndpoint|http://idp.internal/authorize",
+            "logoutEndpoint|http://idp.internal/logout",
+            "authEndpoint|javascript:alert(document.cookie)",
+            "logoutEndpoint|data:text/html;base64,PHNjcmlwdD4="})
+        void shouldRefuseAnEndpointThatDoesNotUseHttps(String field, String value) {
+            assertThatThrownBy(() -> readOne("""
+                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s", "%s": "%s"}
+                    """.formatted(ISSUER, JWKS_URI, field, value)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("https for " + field);
         }
 
         @Test
