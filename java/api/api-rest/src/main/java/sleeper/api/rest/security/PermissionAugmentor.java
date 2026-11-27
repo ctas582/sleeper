@@ -15,6 +15,7 @@
  */
 package sleeper.api.rest.security;
 
+import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.identity.AuthenticationRequestContext;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.quarkus.security.identity.SecurityIdentityAugmentor;
@@ -25,6 +26,7 @@ import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.jwt.JsonWebToken;
+import org.jboss.logging.Logger;
 
 import sleeper.api.auth.PrincipalId;
 import sleeper.api.auth.PrincipalPermissions;
@@ -43,6 +45,7 @@ import java.util.stream.Stream;
  */
 @ApplicationScoped
 public class PermissionAugmentor implements SecurityIdentityAugmentor {
+    private static final Logger LOGGER = Logger.getLogger(PermissionAugmentor.class);
 
     private final InstancePropertiesProvider instanceProperties;
 
@@ -58,10 +61,25 @@ public class PermissionAugmentor implements SecurityIdentityAugmentor {
 
     @Override
     public Uni<SecurityIdentity> augment(SecurityIdentity identity, AuthenticationRequestContext context, Map<String, Object> attributes) {
+        if (identity == null || identity.isAnonymous()) {
+            return Uni.createFrom().item(identity);
+        }
+        Optional<PrincipalId> principal = principalOf(identity);
+        if (principal.isEmpty()) {
+            LOGGER.warnf("Refused a client whose credentials do not say who they are: %s", describe(identity));
+            return Uni.createFrom().failure(new AuthenticationFailedException(
+                    "The credentials presented do not identify a client"));
+        }
         RoutingContext request = HttpSecurityUtils.getRoutingContextAttribute(attributes);
-        return principalOf(identity)
-                .map(principal -> context.runBlocking(() -> withPermissions(identity, principal, request)))
-                .orElseGet(() -> Uni.createFrom().item(identity));
+        return context.runBlocking(() -> withPermissions(identity, principal.get(), request));
+    }
+
+    private static String describe(SecurityIdentity identity) {
+        if (identity.getPrincipal() instanceof JsonWebToken token) {
+            return "a token from " + token.getIssuer() + " is missing the claim the issuer is configured to identify " +
+                    "clients by (principalClaim)";
+        }
+        return "an identity of type " + identity.getPrincipal().getClass().getSimpleName();
     }
 
     /**

@@ -19,6 +19,8 @@ import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import sleeper.api.auth.testutils.TestJwts;
 import sleeper.api.rest.testutils.LocalAwsTestResource;
@@ -98,6 +100,21 @@ class TokenRolesIT {
                 .statusCode(200)
                 .body("admin", is(false))
                 .body("permissions", is(List.of()));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/api/v1/auth/me", "/api/v1/instance/properties"})
+    void shouldRefuseATokenThatDoesNotSayWhoTheClientIs(String path) {
+        // Quarkus reads roles from this claim. With no principal to look up, those roles must not survive.
+        String token = idp.token(ISSUER, null, claims -> claims
+                .audience(AUDIENCE)
+                .claim("sleeper-never-reads-roles-from-a-token", List.of("READ_INSTANCE_CONFIGURATION", "ADMIN")));
+
+        given()
+                .header("Authorization", "Bearer " + token)
+                .when().get(path)
+                .then()
+                .statusCode(401);
     }
 
     private void trustIssuer() {
