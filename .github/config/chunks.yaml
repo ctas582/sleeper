@@ -4,6 +4,7 @@ chunks:
     workflow: chunk-api.yaml
     modules:
       - api/api-auth
+      - api/api-rest
   clients-cdk:
     name: Clients & CDK
     workflow: chunk-clients-cdk.yaml
