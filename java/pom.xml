@@ -285,6 +285,7 @@
         <dependency-check.plugin.version>13.0.0</dependency-check.plugin.version>
         <site.plugin.version>3.22.0</site.plugin.version>
         <exec.plugin.version>3.7.0</exec.plugin.version>
+        <build-helper.plugin.version>3.6.1</build-helper.plugin.version>
         <resources.plugin.version>3.5.0</resources.plugin.version>
         <deploy.plugin.version>3.2.0</deploy.plugin.version>
         <source.plugin.version>3.4.0</source.plugin.version>
@@ -2158,6 +2159,11 @@
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
                     <version>${exec.plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>build-helper-maven-plugin</artifactId>
+                    <version>${build-helper.plugin.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>de.qaware.maven</groupId>

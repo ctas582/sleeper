@@ -24,12 +24,13 @@ get_jar() {
     local artifactId=$(echo "$parts" | cut -d':' -f1)
     local classifier=$(echo "$parts" | cut -d':' -f2)
     local filename=$(echo "$parts" | cut -d':' -f3)
+    local type="${filename##*.}"
     shift 1
     set -x
-    mvn dependency:get -Dartifact="sleeper:$artifactId:$SLEEPER_VERSION:jar:$classifier" -Dtransitive=false "$@"
-    mvn dependency:copy -Dartifact="sleeper:$artifactId:$SLEEPER_VERSION:jar:$classifier" -DoutputDirectory="$JARS_DIR" "$@"
+    mvn dependency:get -Dartifact="sleeper:$artifactId:$SLEEPER_VERSION:$type:$classifier" -Dtransitive=false "$@"
+    mvn dependency:copy -Dartifact="sleeper:$artifactId:$SLEEPER_VERSION:$type:$classifier" -DoutputDirectory="$JARS_DIR" "$@"
     set +x
-    local mvnPath="$JARS_DIR/$artifactId-$SLEEPER_VERSION-$classifier.jar"
+    local mvnPath="$JARS_DIR/$artifactId-$SLEEPER_VERSION-$classifier.$type"
     local outPath="$JARS_DIR/$filename"
     if [[ "$mvnPath" != "$outPath" ]]; then
         set -x
