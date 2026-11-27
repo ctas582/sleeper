@@ -41,8 +41,18 @@ export async function fetchAuthInfo(): Promise<AuthInfo> {
 	return (await response.json()) as AuthInfo
 }
 
+/** Lists the settings an issuer is missing before a browser can sign in with it, by their names in the configuration. */
+export function missingForBrowserSignIn(issuer: Issuer): string[] {
+	const required: [string, string | undefined][] = [
+		['authEndpoint', issuer.authEndpoint],
+		['tokenEndpoint', issuer.tokenEndpoint],
+		['clientId', issuer.clientId],
+	]
+	return required.filter(([, value]) => !value).map(([name]) => name)
+}
+
 export function canSignInFromBrowser(issuer: Issuer): boolean {
-	return Boolean(issuer.authEndpoint && issuer.tokenEndpoint && issuer.clientId)
+	return missingForBrowserSignIn(issuer).length === 0
 }
 
 export function issuersToSignInWith(info: AuthInfo): Issuer[] {

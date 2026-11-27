@@ -15,6 +15,7 @@
  */
 
 import type { AuthInfo } from '../auth/authInfo'
+import { missingForBrowserSignIn } from '../auth/authInfo'
 import './SelectIssuer.css'
 
 interface Props {
@@ -26,11 +27,26 @@ export function NoBrowserSignIn({ info }: Props) {
 		<div className="select-issuer">
 			<h1>Sleeper</h1>
 			<p>This instance has no issuer a browser can sign in with.</p>
-			<p className="select-issuer__detail">
-				{info.iamEnabled
-					? 'It accepts AWS credentials, which a browser cannot present. Use the command line.'
-					: 'Its issuers did not say where to send somebody to sign in.'}
-			</p>
+			{info.issuers.length > 0 && (
+				<>
+					<p className="select-issuer__detail">
+						To sign in from a browser, an issuer must set authEndpoint, tokenEndpoint and clientId in the
+						instance property sleeper.rest.api.auth.oidc.issuers.
+					</p>
+					<ul className="select-issuer__detail">
+						{info.issuers.map(issuer => (
+							<li key={issuer.name}>
+								{issuer.name} is missing {missingForBrowserSignIn(issuer).join(', ')}
+							</li>
+						))}
+					</ul>
+				</>
+			)}
+			{info.iamEnabled && (
+				<p className="select-issuer__detail">
+					It accepts AWS credentials, which a browser cannot present. Use the command line.
+				</p>
+			)}
 		</div>
 	)
 }
