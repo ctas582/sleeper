@@ -19,9 +19,10 @@ unset CDPATH
 THIS_DIR=$(cd "$(dirname "$0")" && pwd)
 cd "$THIS_DIR"
 
-if [ ! -d node_modules ] || [ package-lock.json -nt node_modules ]; then
+INSTALLED=node_modules/.installed-by-maven-build
+if [ ! -f "$INSTALLED" ] || [ package-lock.json -nt "$INSTALLED" ]; then
 	npm ci
-	touch node_modules
+	touch "$INSTALLED"
 fi
 
 npm run build 2>&1
