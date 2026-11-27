@@ -34,9 +34,9 @@ public class InstanceConfigurationExceptionMapper implements ExceptionMapper<Ins
 
     @Override
     public Response toResponse(InstanceConfigurationException exception) {
-        LOGGER.error("Could not read the instance configuration", exception);
+        LOGGER.error("Could not use the instance configuration", exception);
         return Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                .entity(new ApiError("instance_configuration_unreadable", exception.getMessage(), exception.getRemediation()))
+                .entity(new ApiError(exception.getErrorCode(), exception.getMessage(), exception.getRemediation()))
                 .build();
     }
 

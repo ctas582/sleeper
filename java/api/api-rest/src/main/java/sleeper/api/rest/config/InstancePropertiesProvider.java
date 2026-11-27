@@ -22,6 +22,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import software.amazon.awssdk.services.s3.S3Client;
 
 import sleeper.configuration.properties.S3InstanceProperties;
+import sleeper.core.properties.SleeperPropertiesInvalidException;
 import sleeper.core.properties.instance.InstanceProperties;
 
 import java.util.Optional;
@@ -78,11 +79,10 @@ public class InstancePropertiesProvider {
     private InstanceProperties load() {
         try {
             return S3InstanceProperties.loadFromBucket(s3Client, configBucket);
+        } catch (SleeperPropertiesInvalidException e) {
+            throw InstanceConfigurationException.invalid(configBucket, e);
         } catch (RuntimeException e) {
-            throw new InstanceConfigurationException(
-                    "The configuration of this Sleeper instance could not be read from " + configBucket + ".",
-                    "Check the bucket exists, holds this instance's configuration, and that the API is allowed to read it.",
-                    e);
+            throw InstanceConfigurationException.unreadable(configBucket, e);
         }
     }
 

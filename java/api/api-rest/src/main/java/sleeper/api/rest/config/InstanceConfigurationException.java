@@ -15,22 +15,64 @@
  */
 package sleeper.api.rest.config;
 
+import sleeper.core.properties.SleeperPropertiesInvalidException;
+import sleeper.core.properties.SleeperProperty;
+
+import static java.util.stream.Collectors.joining;
+
 /**
- * The configuration of the instance this API serves could not be read.
+ * The configuration of the instance this API serves could not be used, either because it could not be read or
+ * because it is not valid.
  */
 public class InstanceConfigurationException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
+    private final String errorCode;
     private final String remediation;
 
-    public InstanceConfigurationException(String message, String remediation, Throwable cause) {
+    private InstanceConfigurationException(String errorCode, String message, String remediation, Throwable cause) {
         super(message, cause);
+        this.errorCode = errorCode;
         this.remediation = remediation;
     }
 
-    public InstanceConfigurationException(String message, String remediation) {
-        this(message, remediation, null);
+    /**
+     * Creates an exception for when the configuration could not be read.
+     *
+     * @param  bucket the bucket the configuration was read from
+     * @param  cause  what went wrong
+     * @return        the exception
+     */
+    public static InstanceConfigurationException unreadable(String bucket, Throwable cause) {
+        return new InstanceConfigurationException("instance_configuration_unreadable",
+                "The configuration of this Sleeper instance could not be read from " + bucket + ".",
+                "Check the bucket exists, holds this instance's configuration, and that the API is allowed to read it.",
+                cause);
+    }
+
+    /**
+     * Creates an exception for when the configuration was read, but some properties are not valid. Names the
+     * properties, but not their values.
+     *
+     * @param  bucket the bucket the configuration was read from
+     * @param  cause  the validation failure
+     * @return        the exception
+     */
+    public static InstanceConfigurationException invalid(String bucket, SleeperPropertiesInvalidException cause) {
+        String properties = cause.getInvalidValues().keySet().stream()
+                .map(SleeperProperty::getPropertyName)
+                .sorted()
+                .collect(joining(", "));
+        return new InstanceConfigurationException("instance_configuration_invalid",
+                "The configuration of this Sleeper instance in " + bucket + " is not valid. " +
+                        "These properties are invalid: " + properties + ".",
+                "Correct these properties in the instance configuration. The API's logs say why they are invalid.",
+                cause);
+    }
+
+    public String getErrorCode() {
+        return errorCode;
     }
 
     public String getRemediation() {
