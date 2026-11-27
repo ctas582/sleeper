@@ -25,8 +25,10 @@ interface Props {
 
 export function SignedInApp({ issuerName, onChangeIssuer }: Props) {
 	const auth = useAuth()
+	// A failed renewal in the background leaves the user signed in until their token expires
+	const renewalFailed = auth.error?.source === 'renewSilent' && auth.isAuthenticated
 
-	if (auth.error) {
+	if (auth.error && !renewalFailed) {
 		return (
 			<>
 				<h1>Sleeper</h1>
@@ -67,5 +69,14 @@ export function SignedInApp({ issuerName, onChangeIssuer }: Props) {
 			extraQueryParams: { client_id: auth.settings.client_id, logout_uri: returnTo },
 		}).catch(signOutLocally)
 	}
-	return <WhoAmI idToken={auth.user.id_token} onSignOut={signOut} />
+	return (
+		<>
+			{renewalFailed && (
+				<p role="status">
+					Your session with {issuerName} could not be renewed, so you will need to sign in again when it expires.
+				</p>
+			)}
+			<WhoAmI idToken={auth.user.id_token} onSignOut={signOut} />
+		</>
+	)
 }
