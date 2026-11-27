@@ -33,6 +33,7 @@ import static sleeper.core.properties.instance.ApiProperty.API_AUTH_OIDC_ISSUERS
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_CLIENT_ID;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_ISSUER;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_LOGIN_URL;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_IAM_URL;
 
 /**
  * The ways a client may authenticate with an instance's REST API.
@@ -66,7 +67,8 @@ public class AuthSourceRegistry {
             cognitoIssuer(properties).ifPresent(issuers::add);
         }
 
-        return new AuthSourceRegistry(issuers, properties.getBoolean(API_AUTH_IAM_ENABLED));
+        boolean iamEnabled = properties.getBoolean(API_AUTH_IAM_ENABLED) && properties.isSet(REST_API_IAM_URL);
+        return new AuthSourceRegistry(issuers, iamEnabled);
     }
 
     /**

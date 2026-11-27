@@ -33,6 +33,7 @@ import static sleeper.core.properties.instance.ApiProperty.API_AUTH_OIDC_ISSUERS
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_CLIENT_ID;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_ISSUER;
 import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_COGNITO_LOGIN_URL;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_IAM_URL;
 
 public class AuthSourceRegistryTest {
 
@@ -64,8 +65,25 @@ public class AuthSourceRegistryTest {
         @Test
         void shouldAuthenticateWithIamAlone() {
             properties.set(API_AUTH_IAM_ENABLED, "true");
+            deployIamEndpoint();
 
             assertThat(registry().isConfigured()).isTrue();
+        }
+
+        @Test
+        void shouldNotAuthenticateWithIamBeforeTheEndpointHasBeenDeployed() {
+            properties.set(API_AUTH_IAM_ENABLED, "true");
+
+            assertThat(registry().isIamEnabled()).isFalse();
+            assertThat(registry().isConfigured()).isFalse();
+        }
+
+        @Test
+        void shouldNotReportIamOnceItIsSwitchedOffEvenBeforeTheEndpointIsRemoved() {
+            properties.set(API_AUTH_IAM_ENABLED, "false");
+            deployIamEndpoint();
+
+            assertThat(registry().isIamEnabled()).isFalse();
         }
 
         @Test
@@ -86,7 +104,9 @@ public class AuthSourceRegistryTest {
         }
 
         @Test
-        void shouldAuthenticateWithIamByDefault() {
+        void shouldAuthenticateWithIamByDefaultOnceDeployed() {
+            deployIamEndpoint();
+
             assertThat(registry().isConfigured()).isTrue();
             assertThat(registry().isIamEnabled()).isTrue();
         }
@@ -249,6 +269,10 @@ public class AuthSourceRegistryTest {
         properties.set(REST_API_COGNITO_ISSUER, POOL_ISSUER);
         properties.set(REST_API_COGNITO_CLIENT_ID, "the-client-id");
         properties.set(REST_API_COGNITO_LOGIN_URL, POOL_LOGIN_URL);
+    }
+
+    private void deployIamEndpoint() {
+        properties.set(REST_API_IAM_URL, "https://iam-api.execute-api.eu-west-2.amazonaws.com");
     }
 
     private void setIssuers() {

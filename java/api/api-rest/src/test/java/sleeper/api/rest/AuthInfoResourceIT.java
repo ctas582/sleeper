@@ -36,6 +36,7 @@ import static sleeper.api.rest.testutils.SleeperInstanceForTest.instance;
 import static sleeper.api.rest.testutils.SleeperInstanceForTest.saveProperties;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_IAM_ENABLED;
 import static sleeper.core.properties.instance.ApiProperty.API_AUTH_OIDC_ISSUERS;
+import static sleeper.core.properties.instance.CdkDefinedInstanceProperty.REST_API_IAM_URL;
 
 @QuarkusTest
 @QuarkusTestResource(LocalAwsTestResource.class)
@@ -71,7 +72,9 @@ class AuthInfoResourceIT {
 
     @Test
     void shouldReportThatAwsIamRoleMayAuthenticateWhenNoIssuerIsConfigured() {
-        saveProperties(instance());
+        InstanceProperties properties = instance();
+        properties.set(REST_API_IAM_URL, "https://iam-api.execute-api.eu-west-2.amazonaws.com");
+        saveProperties(properties);
 
         given()
                 .when().get("/api/v1/auth/info")
