@@ -168,16 +168,27 @@ public class OidcIssuerConfigSerDeTest {
         @Test
         void shouldReadTheDetailsABrowserNeedsToSendSomeoneToSignIn() {
             assertThat(OidcIssuerConfigSerDe.readList(json("""
-                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
+                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api", "sleeper-ui"], "jwksUri": "%s",
                      "authEndpoint": "https://idp.internal/authorize", "logoutEndpoint": "https://idp.internal/logout",
                      "clientId": "sleeper-ui"}
                     """.formatted(ISSUER, JWKS_URI))))
                     .containsExactly(OidcIssuerConfig.builder()
-                            .name("corp").issuer(ISSUER).audiences(List.of("sleeper-api")).jwksUri(JWKS_URI)
+                            .name("corp").issuer(ISSUER).audiences(List.of("sleeper-api", "sleeper-ui")).jwksUri(JWKS_URI)
                             .authEndpoint("https://idp.internal/authorize")
                             .logoutEndpoint("https://idp.internal/logout")
                             .clientId("sleeper-ui")
                             .build());
+        }
+
+        @Test
+        void shouldRefuseAClientIdForSigningInThatIsNotOneOfTheAudiences() {
+            assertThatThrownBy(() -> OidcIssuerConfigSerDe.readList(json("""
+                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
+                     "authEndpoint": "https://idp.internal/authorize", "clientId": "sleeper-ui"}
+                    """.formatted(ISSUER, JWKS_URI))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("clientId \"sleeper-ui\"")
+                    .hasMessageContaining("audiences");
         }
 
         @Test
@@ -208,7 +219,7 @@ public class OidcIssuerConfigSerDeTest {
         @Test
         void shouldWriteBackEveryFieldItRead() {
             String json = json("""
-                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-api"], "jwksUri": "%s",
+                    {"name": "corp", "issuer": "%s", "audiences": ["sleeper-ui"], "jwksUri": "%s",
                      "tokenEndpoint": "https://idp.internal/token",
                      "authEndpoint": "https://idp.internal/authorize", "clientId": "sleeper-ui",
                      "logoutEndpoint": "https://idp.internal/logout",
