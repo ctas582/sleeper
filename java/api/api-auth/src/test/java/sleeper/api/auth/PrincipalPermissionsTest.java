@@ -87,6 +87,13 @@ public class PrincipalPermissionsTest {
             assertThat(permissions.allows(READ_TABLE_CONFIGURATION, "events")).isTrue();
             assertThat(permissions.allows(READ_TABLE_CONFIGURATION, "a-table-added-later")).isTrue();
         }
+
+        @Test
+        void shouldNotAllowAPermissionAcrossTheInstanceFromAGrantOverParticularTables() {
+            PermissionGrant grant = PermissionGrant.of(READ_TABLE_CONFIGURATION, TableScope.tables(List.of("events")));
+
+            assertThat(grant.allows(READ_TABLE_CONFIGURATION)).isFalse();
+        }
     }
 
     @Nested

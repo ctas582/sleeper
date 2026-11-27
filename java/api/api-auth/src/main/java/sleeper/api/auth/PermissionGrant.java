@@ -89,7 +89,7 @@ public class PermissionGrant {
      * @return          true if this grant allows it
      */
     public boolean allows(SleeperPermission required) {
-        return permission == required;
+        return tables == null && permission == required;
     }
 
     /**
